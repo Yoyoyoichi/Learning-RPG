@@ -3,6 +3,7 @@ import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
 import { getRandomQuestion } from './utils/questions';
+import { exportStatsToCSV } from './utils/stats';
 import {
   generateStarterDeck,
   getRandomRewardCards,
@@ -1258,6 +1259,12 @@ function App() {
         </label>
 
         <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>📊 成績・学習記録</h3>
+        <div style={{ marginBottom: '8px' }}>
+          <button onClick={exportStatsToCSV} style={{ width: '100%', padding: '8px', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            📊 成績をCSVで書き出し (Excel用)
+          </button>
+        </div>
+        
         {Object.keys(stats).length === 0 ? (
           <div style={{ fontSize: '0.85rem', color: '#71717a' }}>まだ記録がありません。クイズに答えよう！</div>
         ) : (
