@@ -22,8 +22,8 @@ import {
 import './App.css';
 
 // Grid Dimensions
-const COLS = 20;
-const ROWS = 20;
+const COLS = 100;
+const ROWS = 100;
 
 // Procedural Dungeon Generator
 const generateDungeon = (floor) => {
@@ -39,14 +39,15 @@ const generateDungeon = (floor) => {
   }
 
   const rooms = [];
-  const minSize = 4;
-  const maxSize = 6;
-  const maxRooms = 6;
+  const minSize = 5;
+  const maxRooms = 35;
 
   // 2. Generate random rooms
   for (let i = 0; i < maxRooms; i++) {
-    const w = Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
-    const h = Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
+    // Dynamic max size for some larger rooms
+    const currentMaxSize = Math.random() < 0.2 ? 12 : 8;
+    const w = Math.floor(Math.random() * (currentMaxSize - minSize + 1)) + minSize;
+    const h = Math.floor(Math.random() * (currentMaxSize - minSize + 1)) + minSize;
     const x = Math.floor(Math.random() * (COLS - w - 2)) + 1;
     const y = Math.floor(Math.random() * (ROWS - h - 2)) + 1;
 
@@ -206,7 +207,7 @@ const generateDungeon = (floor) => {
     }
   }
 
-  return { grid, enemies, items, startPos };
+  return { grid, rooms, enemies, items, startPos };
 };
 
 // Initial Player Stats
@@ -301,6 +302,8 @@ const rollEnemyIntent = (enemy, turnNumber) => {
 function App() {
   const [player, setPlayer] = useState(INITIAL_PLAYER);
   const [grid, setGrid] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [exploredTiles, setExploredTiles] = useState({});
   const [enemies, setEnemies] = useState([]);
   const [items, setItems] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -328,6 +331,45 @@ function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Calculate Fog of War visibility
+  useEffect(() => {
+    if (grid.length === 0 || rooms.length === 0) return;
+    
+    setExploredTiles(prev => {
+      const next = { ...prev };
+      let changed = false;
+      
+      const mark = (x, y) => {
+        const key = `${x},${y}`;
+        if (!next[key]) {
+          next[key] = true;
+          changed = true;
+        }
+      };
+
+      // Reveal 5x5 around player
+      for(let r = -2; r <= 2; r++) {
+        for(let c = -2; c <= 2; c++) {
+          mark(player.x + c, player.y + r);
+        }
+      }
+      
+      // If in a room, reveal the whole room
+      for (const room of rooms) {
+        if (player.x >= room.x && player.x < room.x + room.w &&
+            player.y >= room.y && player.y < room.y + room.h) {
+          for(let r = room.y - 1; r <= room.y + room.h; r++) {
+            for(let c = room.x - 1; c <= room.x + room.w; c++) {
+              mark(c, r);
+            }
+          }
+        }
+      }
+      
+      return changed ? next : prev;
+    });
+  }, [player.x, player.y, grid, rooms]);
 
   const [windows, setWindows] = useState(() => {
     const saved = localStorage.getItem('learning_rpg_windows');
@@ -1388,8 +1430,10 @@ function App() {
   const startNewGame = () => {
     const dungeon = generateDungeon(1);
     setGrid(dungeon.grid);
+    setRooms(dungeon.rooms);
     setEnemies(dungeon.enemies);
     setItems(dungeon.items);
+    setExploredTiles({});
     setPlayer({
       ...INITIAL_PLAYER,
       x: dungeon.startPos.x,
@@ -1417,8 +1461,10 @@ function App() {
   const loadNextFloor = (nextFloorNum) => {
     const dungeon = generateDungeon(nextFloorNum);
     setGrid(dungeon.grid);
+    setRooms(dungeon.rooms);
     setEnemies(dungeon.enemies);
     setItems(dungeon.items);
+    setExploredTiles({});
     
     setPlayer(prev => {
       return {
@@ -1821,25 +1867,45 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [player, grid, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
 
-  const renderGrid = grid.map((row, rIdx) => 
-    row.map((tile, cIdx) => {
-      if (player.x === cIdx && player.y === rIdx && !gameOver) {
-        return { char: '@', type: 'player' };
-      }
-      
-      const enemy = enemies.find(e => e.x === cIdx && e.y === rIdx);
-      if (enemy) {
-        return { char: enemy.char, type: 'enemy', subType: enemy.subType };
-      }
+  const VIEWPORT_RADIUS = 10;
+  const renderGrid = [];
+  
+  if (grid.length > 0) {
+    for (let r = player.y - VIEWPORT_RADIUS; r <= player.y + VIEWPORT_RADIUS; r++) {
+      const row = [];
+      for (let c = player.x - VIEWPORT_RADIUS; c <= player.x + VIEWPORT_RADIUS; c++) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) {
+          row.push({ char: ' ', type: 'void' });
+          continue;
+        }
 
-      const item = items.find(i => i.x === cIdx && i.y === rIdx);
-      if (item) {
-        return { char: item.char, type: 'item', subType: item.subType };
-      }
+        const isExplored = exploredTiles[`${c},${r}`];
+        if (!isExplored) {
+          row.push({ char: ' ', type: 'fog' });
+          continue;
+        }
 
-      return tile;
-    })
-  );
+        let tile = grid[r][c];
+
+        if (player.x === c && player.y === r && !gameOver) {
+          tile = { char: '@', type: 'player' };
+        } else {
+          const enemy = enemies.find(e => e.x === c && e.y === r);
+          if (enemy) {
+            tile = { char: enemy.char, type: 'enemy', subType: enemy.subType };
+          } else {
+            const item = items.find(i => i.x === c && i.y === r);
+            if (item) {
+              tile = { char: item.char, type: 'item', subType: item.subType };
+            }
+          }
+        }
+        
+        row.push(tile);
+      }
+      renderGrid.push(row);
+    }
+  }
 
   return (
     <div className="app-container retro-theme">

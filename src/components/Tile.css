@@ -97,3 +97,13 @@
   text-shadow: 0 0 6px #ff00ff, 0 0 12px rgba(255, 0, 255, 0.4);
   font-size: calc(var(--tile-size) * 0.75);
 }
+
+/* Fog of War & Void */
+.tile-fog {
+  background-color: #000;
+  border-color: #000;
+}
+.tile-void {
+  background-color: transparent;
+  border-color: transparent;
+}
