@@ -754,5 +754,151 @@ html, body {
   padding-bottom: 20px;
 }
 
+/* Card Battler Premium Aesthetics */
 
+.battle-screen {
+  font-family: 'Consolas', 'Courier New', Courier, monospace;
+}
 
+.status-badge {
+  font-size: 0.62rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  user-select: none;
+}
+
+.status-badge.str {
+  background: #7f1d1d;
+  color: #fca5a5;
+  border: 1px solid #b91c1c;
+}
+
+.status-badge.weak {
+  background: #78350f;
+  color: #fde68a;
+  border: 1px solid #d97706;
+}
+
+.status-badge.vul {
+  background: #4c1d95;
+  color: #ddd6fe;
+  border: 1px solid #7c3aed;
+}
+
+.status-badge.met {
+  background: #374151;
+  color: #e5e7eb;
+  border: 1px solid #6b7280;
+}
+
+.status-badge.df {
+  background: #ea580c;
+  color: #fff;
+  border: 1px solid #f97316;
+  box-shadow: 0 0 6px #ea580c80;
+}
+
+.status-badge.bar {
+  background: #1e3a8a;
+  color: #93c5fd;
+  border: 1px solid #2563eb;
+}
+
+/* Battle Card Interactions */
+.battle-card {
+  transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.2s, border-color 0.2s;
+  user-select: none;
+}
+
+.battle-card.playable:hover {
+  transform: translateY(-8px) scale(1.05) !important;
+  z-index: 10;
+}
+
+.battle-card.playable.attack:hover {
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+  border-color: #ef4444;
+}
+
+.battle-card.playable.skill:hover {
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+  border-color: #3b82f6;
+}
+
+.battle-card.playable.power:hover {
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.8);
+  border-color: #eab308;
+}
+
+.battle-card.unplayable {
+  cursor: not-allowed;
+  filter: grayscale(0.8) contrast(0.8);
+}
+
+/* Intent Bubble Pulse */
+.intent-bubble {
+  animation: intentPulse 2s infinite ease-in-out;
+}
+
+@keyframes intentPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px rgba(255,255,255,0.1);
+  }
+}
+
+/* Animations */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Campsite transitions */
+.campsite-screen button, .reward-screen button {
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.campsite-screen button:hover:not(:disabled), .reward-screen button:hover:not(:disabled) {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+}
+
+.campsite-screen button:active:not(:disabled), .reward-screen button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Custom cards tab scroll container styling */
+.deck-list-container::-webkit-scrollbar {
+  width: 4px;
+}
+.deck-list-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+.deck-list-container::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 2px;
+}
+
+.deck-card-item {
+  transition: transform 0.15s ease;
+}
+
+.deck-card-item:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
