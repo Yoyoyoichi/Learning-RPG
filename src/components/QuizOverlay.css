@@ -1,11 +1,11 @@
 .quiz-box {
   width: 100%;
-  max-width: 504px; /* Matches map width (20 cols * 24px = 480px + borders/padding) */
-  height: 196px; /* Exactly matches D-pad height to prevent page layout shifts */
+  max-width: 100%;
+  min-height: 180px;
   background: rgba(18, 18, 22, 0.95);
   border: 2px solid #27272a;
   border-radius: 12px;
-  padding: 0.65rem 1rem;
+  padding: 0.65rem 0.85rem;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
   display: flex;
@@ -58,8 +58,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  height: 38px;
+  height: auto;
+  min-height: 28px;
   box-sizing: border-box;
+  margin: 4px 0;
 }
 
 .question-label {
@@ -119,8 +121,7 @@
   flex-direction: column;
   gap: 6px;
   z-index: 5;
-  height: 80px;
-  justify-content: space-between;
+  height: auto;
   box-sizing: border-box;
 }
 

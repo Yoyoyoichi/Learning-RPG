@@ -227,6 +227,408 @@ function App() {
 
   const logEndRef = useRef(null);
 
+  const [showDpad, setShowDpad] = useState(false);
+
+  // Window states and manager logic
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const [windows, setWindows] = useState(() => {
+    const saved = localStorage.getItem('learning_rpg_windows');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.map && parsed.status && parsed.logs && parsed.legend && parsed.wordlist) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return {
+      map: { x: 10, y: 10, width: 420, height: 480, zIndex: 10, visible: true },
+      status: { x: 440, y: 10, width: 280, height: 320, zIndex: 10, visible: true },
+      logs: { x: 730, y: 10, width: 330, height: 200, zIndex: 10, visible: true },
+      legend: { x: 730, y: 220, width: 330, height: 180, zIndex: 10, visible: true },
+      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false }
+    };
+  });
+
+  const bringToFront = (id) => {
+    setWindows(prev => {
+      const maxZ = Object.values(prev).reduce((max, w) => Math.max(max, w.zIndex || 0), 0);
+      const updated = {
+        ...prev,
+        [id]: { ...prev[id], zIndex: maxZ + 1 }
+      };
+      localStorage.setItem('learning_rpg_windows', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const toggleWindow = (id) => {
+    setWindows(prev => {
+      const maxZ = Object.values(prev).reduce((max, w) => Math.max(max, w.zIndex || 0), 0);
+      const updated = {
+        ...prev,
+        [id]: { 
+          ...prev[id], 
+          visible: !prev[id].visible,
+          zIndex: !prev[id].visible ? maxZ + 1 : prev[id].zIndex
+        }
+      };
+      localStorage.setItem('learning_rpg_windows', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const updateWindow = (id, params) => {
+    setWindows(prev => ({
+      ...prev,
+      [id]: { ...prev[id], ...params }
+    }));
+  };
+
+  const resetWindows = () => {
+    const defaults = {
+      map: { x: 10, y: 10, width: 420, height: 480, zIndex: 10, visible: true },
+      status: { x: 440, y: 10, width: 280, height: 320, zIndex: 10, visible: true },
+      logs: { x: 730, y: 10, width: 330, height: 200, zIndex: 10, visible: true },
+      legend: { x: 730, y: 220, width: 330, height: 180, zIndex: 10, visible: true },
+      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false }
+    };
+    setWindows(defaults);
+    localStorage.setItem('learning_rpg_windows', JSON.stringify(defaults));
+  };
+
+  const handleDragStart = (id, e) => {
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    if (clientX === undefined || clientY === undefined) return;
+    
+    bringToFront(id);
+
+    const startX = clientX;
+    const startY = clientY;
+    const winX = windows[id].x;
+    const winY = windows[id].y;
+
+    const handleDragMove = (moveEvent) => {
+      const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX);
+      const currentY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0].clientY);
+      const dx = currentX - startX;
+      const dy = currentY - startY;
+
+      updateWindow(id, {
+        x: Math.max(0, winX + dx),
+        y: Math.max(0, winY + dy)
+      });
+    };
+
+    const handleDragEnd = () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleDragMove);
+      window.removeEventListener('touchend', handleDragEnd);
+
+      // Save final layout to localStorage on drag end
+      setWindows(latest => {
+        localStorage.setItem('learning_rpg_windows', JSON.stringify(latest));
+        return latest;
+      });
+    };
+
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('touchmove', handleDragMove, { passive: true });
+    window.addEventListener('touchend', handleDragEnd);
+  };
+
+  const handleResizeStart = (id, e) => {
+    e.stopPropagation();
+    
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    if (clientX === undefined || clientY === undefined) return;
+
+    bringToFront(id);
+
+    const startX = clientX;
+    const startY = clientY;
+    const winW = windows[id].width;
+    const winH = windows[id].height;
+
+    const minWidth = id === 'map' ? 360 : id === 'status' ? 250 : 200;
+    const minHeight = id === 'map' ? 380 : id === 'status' ? 240 : 120;
+
+    const handleResizeMove = (moveEvent) => {
+      const currentX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX);
+      const currentY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0].clientY);
+      const dx = currentX - startX;
+      const dy = currentY - startY;
+
+      updateWindow(id, {
+        width: Math.max(minWidth, winW + dx),
+        height: Math.max(minHeight, winH + dy)
+      });
+    };
+
+    const handleResizeEnd = () => {
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeEnd);
+      window.removeEventListener('touchmove', handleResizeMove);
+      window.removeEventListener('touchend', handleResizeEnd);
+
+      // Save final layout to localStorage on resize end
+      setWindows(latest => {
+        localStorage.setItem('learning_rpg_windows', JSON.stringify(latest));
+        return latest;
+      });
+    };
+
+    window.addEventListener('mousemove', handleResizeMove);
+    window.addEventListener('mouseup', handleResizeEnd);
+    window.addEventListener('touchmove', handleResizeMove, { passive: true });
+    window.addEventListener('touchend', handleResizeEnd);
+  };
+
+  // Reset window scroll position and block browser scroll events to prevent auto-scroll layout bugs
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+    window.scrollTo(0, 0);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const renderMapContent = () => (
+    <div className="map-panel-body" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+        <button 
+          type="button" 
+          className="layout-ctrl-btn" 
+          onClick={() => setShowDpad(prev => !prev)} 
+          style={{ color: showDpad ? '#00ff66' : '#888' }}
+          title="コントローラーの表示/非表示"
+        >
+          {showDpad ? '🎮 パッド非表示' : '🎮 パッド表示'}
+        </button>
+      </div>
+      <div className="map-container-wrapper">
+        <TileMap grid={renderGrid} />
+      </div>
+      <div className="controls-wrapper" style={{ width: '100%' }}>
+        {activeQuiz ? (
+          <QuizOverlay 
+            wordObj={activeQuiz.wordObj}
+            onCorrect={() => resolveCombatTurn(true)}
+            onIncorrect={() => resolveCombatTurn(false)}
+          />
+        ) : showDpad ? (
+          <div className="dpad-container">
+            <button className="dpad-btn empty"></button>
+            <button className="dpad-btn" onClick={() => handleMove(0, -1)}>▲</button>
+            <button className="dpad-btn empty"></button>
+            
+            <button className="dpad-btn" onClick={() => handleMove(-1, 0)}>◀</button>
+            <button className="dpad-btn wait" onClick={handleWait}>WAIT</button>
+            <button className="dpad-btn" onClick={() => handleMove(1, 0)}>▶</button>
+            
+            <button className="dpad-btn empty"></button>
+            <button className="dpad-btn" onClick={() => handleMove(0, 1)}>▼</button>
+            <button className="dpad-btn empty"></button>
+          </div>
+        ) : (
+          <div className="keyboard-hint" style={{ fontSize: '0.72rem', color: '#71717a', textAlign: 'center', padding: '0.5rem', border: '1px dashed #27272a', borderRadius: '8px', lineHeight: '1.3' }}>
+            ⌨️ 矢印キー / WASD<br/>で移動できます。<br/>Spaceで待機。
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderStatusContent = () => (
+    <div style={{ width: '100%' }}>
+      {/* HP Bar */}
+      <div className="bar-container">
+        <div className="bar-header">
+          <span>HP: {player.hp} / {player.maxHp}</span>
+        </div>
+        <div className="bar-bg">
+          <div 
+            className="bar-fill hp" 
+            style={{ width: `${Math.max(0, (player.hp / player.maxHp) * 100)}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* XP Bar */}
+      <div className="bar-container">
+        <div className="bar-header">
+          <span>XP: {player.xp} / {player.xpNeeded}</span>
+        </div>
+        <div className="bar-bg">
+          <div 
+            className="bar-fill xp" 
+            style={{ width: `${Math.min(100, (player.xp / player.xpNeeded) * 100)}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* General Stats Grid */}
+      <div className="stats-grid">
+        <div className="stat-item">
+          <span className="stat-label">LEVEL</span>
+          <span className="stat-value level">{player.level}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">GOLD</span>
+          <span className="stat-value gold">{player.gold} G</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">ATK</span>
+          <span className="stat-value">
+            {player.atk} {player.swordEquipped && <span style={{ color: '#00d2ff' }}>+4</span>}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">DEF</span>
+          <span className="stat-value">
+            {player.def} {player.shieldEquipped && <span style={{ color: '#3385ff' }}>+2</span>}
+          </span>
+        </div>
+      </div>
+
+      {/* Inventory Slots */}
+      <div className="panel-title-sub" style={{ fontSize: '0.75rem', marginTop: '0.4rem', marginBottom: '0.2rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>
+        EQUIPPED ITEMS
+      </div>
+      <div className="inventory-list">
+        <div className={`inventory-slot ${player.swordEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.swordEquipped ? '🗡️' : '➖'}</span>
+          <span>{player.swordEquipped ? '鉄の剣 (+4)' : '武器スロット'}</span>
+        </div>
+        <div className={`inventory-slot ${player.shieldEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.shieldEquipped ? '🛡️' : '➖'}</span>
+          <span>{player.shieldEquipped ? '鉄の盾 (+2)' : '防具スロット'}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderLogsContent = () => (
+    <div className="log-container" style={{ height: '100%', minHeight: '80px' }}>
+      {logs.map((log, index) => (
+        <div key={index} className={`log-entry ${log.type}`}>
+          <small style={{ color: '#52525b', marginRight: '6px' }}>[{log.time}]</small>
+          {log.text}
+        </div>
+      ))}
+      <div ref={logEndRef} />
+    </div>
+  );
+
+  const renderLegendContent = () => (
+    <div className="legend-box">
+      <div className="legend-item"><span className="legend-symbol tile-player">@</span><span>自分</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-wall">#</span><span>壁</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-floor">.</span><span>床</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-enemy">s/S</span><span>敵</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-item tile-sub-potion">P</span><span>回復薬</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-item tile-sub-chest">C</span><span>宝箱</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-item tile-sub-sword">W</span><span>武器</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-item tile-sub-shield">D</span><span>防具</span></div>
+      <div className="legend-item"><span className="legend-symbol tile-stairs">&gt;</span><span>階段</span></div>
+    </div>
+  );
+
+  const renderWordListContent = () => (
+    <WordListPanel 
+      learnedWords={learnedWords}
+      customWordsCount={customWords.length}
+      onImportCustomWords={(words) => {
+        setCustomWords(words);
+        addLog(`カスタム単語リスト (${words.length}語) を読み込みました！`, 'system');
+      }}
+      onClearCustomWords={() => {
+        setCustomWords([]);
+        addLog("デフォルトの単語リストに戻しました。", 'system');
+      }}
+    />
+  );
+
+  const renderMobilePanel = (title, content) => (
+    <div className="panel" style={{ width: '100%', boxSizing: 'border-box' }}>
+      <div className="panel-title">
+        <span>{title}</span>
+      </div>
+      <div className="panel-body">
+        {content}
+      </div>
+    </div>
+  );
+
+  const renderMobileContent = () => {
+    if (rightTab === 'wordlist') {
+      return renderWordListContent();
+    }
+    return (
+      <>
+        {renderMobilePanel('DUNGEON MAP', renderMapContent())}
+        {renderMobilePanel('PLAYER STATUS', renderStatusContent())}
+        {renderMobilePanel('ACTION LOGS', renderLogsContent())}
+        {renderMobilePanel('LEGEND & KEY', renderLegendContent())}
+      </>
+    );
+  };
+
+  const renderWindow = (id, title, content) => {
+    const win = windows[id];
+    if (!win) return null;
+
+    return (
+      <div 
+        key={id}
+        className="window" 
+        style={{
+          position: 'absolute',
+          left: `${win.x}px`,
+          top: `${win.y}px`,
+          width: `${win.width}px`,
+          height: `${win.height}px`,
+          zIndex: win.zIndex,
+          display: win.visible ? 'flex' : 'none'
+        }}
+        onMouseDown={() => bringToFront(id)}
+        onTouchStart={() => bringToFront(id)}
+      >
+        <div 
+          className="window-header" 
+          onMouseDown={(e) => handleDragStart(id, e)}
+          onTouchStart={(e) => handleDragStart(id, e)}
+        >
+          <span className="window-title">{title}</span>
+          <button className="window-close-btn" onClick={() => toggleWindow(id)}>✕</button>
+        </div>
+        <div className="window-body">
+          {content}
+        </div>
+        <div 
+          className="window-resize-handle" 
+          onMouseDown={(e) => handleResizeStart(id, e)}
+          onTouchStart={(e) => handleResizeStart(id, e)}
+        ></div>
+      </div>
+    );
+  };
+
   // Helper to add logs
   const addLog = (text, type = 'system') => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -743,182 +1145,85 @@ function App() {
   return (
     <div className="app-container retro-theme">
       <header className="app-header">
-        <h1>ROGUE-TEXT RPG</h1>
-        <p>Retro ASCII Roguelike Dungeon Explorer</p>
-      </header>
-
-      <main className="app-main">
-        {/* Left column: Grid map and mobile D-pad */}
-        <div className="game-left-col">
-          <TileMap grid={renderGrid} />
-
-          {activeQuiz ? (
-            <QuizOverlay 
-              wordObj={activeQuiz.wordObj}
-              onCorrect={() => resolveCombatTurn(true)}
-              onIncorrect={() => resolveCombatTurn(false)}
-            />
-          ) : (
-            /* D-pad Controller */
-            <div className="dpad-container">
-              <button className="dpad-btn empty"></button>
-              <button className="dpad-btn" onClick={() => handleMove(0, -1)}>▲</button>
-              <button className="dpad-btn empty"></button>
-              
-              <button className="dpad-btn" onClick={() => handleMove(-1, 0)}>◀</button>
-              <button className="dpad-btn wait" onClick={handleWait}>WAIT</button>
-              <button className="dpad-btn" onClick={() => handleMove(1, 0)}>▶</button>
-              
-              <button className="dpad-btn empty"></button>
-              <button className="dpad-btn" onClick={() => handleMove(0, 1)}>▼</button>
-              <button className="dpad-btn empty"></button>
-            </div>
-          )}
+        <div className="header-left">
+          <h1>ROGUE-TEXT RPG</h1>
+          <p>Retro ASCII Roguelike Dungeon Explorer</p>
         </div>
-
-        {/* Right column: Stats, Inventory, Logs and Word List */}
-        <div className="game-right-col">
-          {/* Panel tab switches */}
+        
+        {!isMobile ? (
+          <div className="window-controls">
+            <button 
+              className={`control-btn ${windows.map.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('map')}
+            >
+              🗺️ MAP
+            </button>
+            <button 
+              className={`control-btn ${windows.status.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('status')}
+            >
+              📊 STATUS
+            </button>
+            <button 
+              className={`control-btn ${windows.logs.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('logs')}
+            >
+              📜 LOGS
+            </button>
+            <button 
+              className={`control-btn ${windows.legend.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('legend')}
+            >
+              🔑 LEGEND
+            </button>
+            <button 
+              className={`control-btn ${windows.wordlist.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('wordlist')}
+            >
+              📖 WORDLIST ({Object.keys(learnedWords).length})
+            </button>
+            <button 
+              className="control-btn reset-layout-btn"
+              onClick={resetWindows}
+              title="ウィンドウ配置をリセット"
+            >
+              🔄 RESET
+            </button>
+          </div>
+        ) : (
           <div className="panel-tabs">
             <button 
+              type="button"
               className={`panel-tab-btn ${rightTab === 'status' ? 'active' : ''}`}
               onClick={() => setRightTab('status')}
             >
-              📊 ステータス & ログ
+              📊 プレイ画面
             </button>
             <button 
+              type="button"
               className={`panel-tab-btn ${rightTab === 'wordlist' ? 'active' : ''}`}
               onClick={() => setRightTab('wordlist')}
             >
-              📖 単語帳・設定 ({Object.keys(learnedWords).length})
+              📖 単語帳 ({Object.keys(learnedWords).length})
             </button>
           </div>
+        )}
+      </header>
 
-          {rightTab === 'status' ? (
-            <>
-              {/* Status Panel */}
-              <div className="panel">
-                <div className="panel-title">
-                  <span>PLAYER STATUS</span>
-                  <span className="stat-value floor">B{player.floor}F</span>
-                </div>
-                
-                {/* HP Bar */}
-                <div className="bar-container">
-                  <div className="bar-header">
-                    <span>HP: {player.hp} / {player.maxHp}</span>
-                  </div>
-                  <div className="bar-bg">
-                    <div 
-                      className="bar-fill hp" 
-                      style={{ width: `${Math.max(0, (player.hp / player.maxHp) * 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* XP Bar */}
-                <div className="bar-container">
-                  <div className="bar-header">
-                    <span>XP: {player.xp} / {player.xpNeeded}</span>
-                  </div>
-                  <div className="bar-bg">
-                    <div 
-                      className="bar-fill xp" 
-                      style={{ width: `${Math.min(100, (player.xp / player.xpNeeded) * 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* General Stats Grid */}
-                <div className="stats-grid">
-                  <div className="stat-item">
-                    <span className="stat-label">LEVEL</span>
-                    <span className="stat-value level">{player.level}</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">GOLD</span>
-                    <span className="stat-value gold">{player.gold} G</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">ATK (ATTACK)</span>
-                    <span className="stat-value">
-                      {player.atk} {player.swordEquipped && <span style={{ color: '#00d2ff' }}>+4</span>}
-                    </span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">DEF (DEFENSE)</span>
-                    <span className="stat-value">
-                      {player.def} {player.shieldEquipped && <span style={{ color: '#3385ff' }}>+2</span>}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Inventory Slots */}
-                <div className="panel-title" style={{ fontSize: '0.9rem', marginTop: '1rem', marginBottom: '0.5rem' }}>
-                  EQUIPPED ITEMS
-                </div>
-                <div className="inventory-list">
-                  <div className={`inventory-slot ${player.swordEquipped ? 'equipped' : ''}`}>
-                    <span className="equip-icon">{player.swordEquipped ? '🗡️' : '➖'}</span>
-                    <span>{player.swordEquipped ? '鉄の剣 (+4)' : '武器スロット'}</span>
-                  </div>
-                  <div className={`inventory-slot ${player.shieldEquipped ? 'equipped' : ''}`}>
-                    <span className="equip-icon">{player.shieldEquipped ? '🛡️' : '➖'}</span>
-                    <span>{player.shieldEquipped ? '鉄の盾 (+2)' : '防具スロット'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Activity Logs Panel */}
-              <div className="panel">
-                <div className="panel-title">ACTION LOGS</div>
-                <div className="log-container">
-                  {logs.map((log, index) => (
-                    <div key={index} className={`log-entry ${log.type}`}>
-                      <small style={{ color: '#52525b', marginRight: '6px' }}>[{log.time}]</small>
-                      {log.text}
-                    </div>
-                  ))}
-                  <div ref={logEndRef} />
-                </div>
-              </div>
-
-              {/* Symbol Legend box */}
-              <div className="panel">
-                <div className="panel-title" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>LEGEND & KEY</div>
-                <div className="legend-box">
-                  <div className="legend-item"><span className="legend-symbol tile-player">@</span><span>Player</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-wall">#</span><span>Wall</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-floor">.</span><span>Floor</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-enemy">s/S</span><span>Monster</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-item tile-sub-potion">P</span><span>Potion</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-item tile-sub-chest">C</span><span>Chest</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-item tile-sub-sword">W</span><span>Sword</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-item tile-sub-shield">D</span><span>Shield</span></div>
-                  <div className="legend-item"><span className="legend-symbol tile-stairs">&gt;</span><span>Stairs</span></div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <WordListPanel 
-              learnedWords={learnedWords}
-              customWordsCount={customWords.length}
-              onImportCustomWords={(words) => {
-                setCustomWords(words);
-                addLog(`カスタム単語リスト (${words.length}語) を読み込みました！`, 'system');
-              }}
-              onClearCustomWords={() => {
-                setCustomWords([]);
-                addLog("デフォルトの単語リストに戻しました。", 'system');
-              }}
-            />
-          )}
-
-          {/* Restart Control Button */}
-          <button className="action-btn reset-panel" onClick={startNewGame}>
-            GIVE UP & RESTART
-          </button>
-        </div>
+      <main className="app-main">
+        {isMobile ? (
+          <div className="mobile-layout-container" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
+            {renderMobileContent()}
+          </div>
+        ) : (
+          <div className="desktop-area">
+            {renderWindow('map', 'Dungeon Map', renderMapContent())}
+            {renderWindow('status', 'Player Status', renderStatusContent())}
+            {renderWindow('logs', 'Action Logs', renderLogsContent())}
+            {renderWindow('legend', 'Legend & Key', renderLegendContent())}
+            {renderWindow('wordlist', 'Word List & Settings', renderWordListContent())}
+          </div>
+        )}
       </main>
 
       {/* Game Over Screen */}

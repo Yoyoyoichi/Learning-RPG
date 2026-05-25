@@ -12,8 +12,8 @@ const TileMap = ({ grid }) => {
       <div 
         className="tilemap" 
         style={{
-          gridTemplateColumns: `repeat(${grid[0].length}, 24px)`,
-          gridTemplateRows: `repeat(${grid.length}, 24px)`
+          gridTemplateColumns: `repeat(${grid[0].length}, var(--tile-size))`,
+          gridTemplateRows: `repeat(${grid.length}, var(--tile-size))`
         }}
       >
         {grid.map((row, rowIndex) => 

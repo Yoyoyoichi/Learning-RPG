@@ -1,6 +1,6 @@
 .tile {
-  width: 24px;
-  height: 24px;
+  width: var(--tile-size);
+  height: var(--tile-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,7 +12,7 @@
 
 .tile-text {
   font-family: 'Consolas', 'Courier New', Courier, monospace;
-  font-size: 16px;
+  font-size: calc(var(--tile-size) * 0.65);
   font-weight: bold;
   user-select: none;
   line-height: 1;
@@ -35,7 +35,7 @@
 .tile-player {
   color: #00ff66;
   text-shadow: 0 0 5px #00ff66, 0 0 10px rgba(0, 255, 102, 0.3);
-  font-size: 18px;
+  font-size: calc(var(--tile-size) * 0.75);
 }
 
 /* Enemies */
@@ -95,5 +95,5 @@
 .tile-stairs {
   color: #ff00ff;
   text-shadow: 0 0 6px #ff00ff, 0 0 12px rgba(255, 0, 255, 0.4);
-  font-size: 18px;
+  font-size: calc(var(--tile-size) * 0.75);
 }
