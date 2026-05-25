@@ -21,12 +21,10 @@ import {
 } from './utils/sound';
 import './App.css';
 
-// Grid Dimensions
-const COLS = 100;
-const ROWS = 100;
-
 // Procedural Dungeon Generator
 const generateDungeon = (floor) => {
+  const COLS = Math.min(100, 30 + (floor - 1) * 10);
+  const ROWS = Math.min(100, 30 + (floor - 1) * 10);
   const grid = [];
   
   // 1. Initialize map with walls
@@ -40,7 +38,7 @@ const generateDungeon = (floor) => {
 
   const rooms = [];
   const minSize = 5;
-  const maxRooms = 35;
+  const maxRooms = Math.floor((COLS * ROWS) / 250); // Scale rooms by map area
 
   // 2. Generate random rooms
   for (let i = 0; i < maxRooms; i++) {
@@ -1871,10 +1869,13 @@ function App() {
   const renderGrid = [];
   
   if (grid.length > 0) {
+    const currentRows = grid.length;
+    const currentCols = grid[0].length;
+    
     for (let r = player.y - VIEWPORT_RADIUS; r <= player.y + VIEWPORT_RADIUS; r++) {
       const row = [];
       for (let c = player.x - VIEWPORT_RADIUS; c <= player.x + VIEWPORT_RADIUS; c++) {
-        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) {
+        if (r < 0 || r >= currentRows || c < 0 || c >= currentCols) {
           row.push({ char: ' ', type: 'void' });
           continue;
         }
