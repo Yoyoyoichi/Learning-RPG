@@ -1631,7 +1631,9 @@ function App() {
     const tx = player.x + dx;
     const ty = player.y + dy;
 
-    if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) return;
+    const currentRows = grid.length;
+    const currentCols = grid.length > 0 ? grid[0].length : 0;
+    if (tx < 0 || tx >= currentCols || ty < 0 || ty >= currentRows) return;
 
     const targetTile = grid[ty][tx];
     if (targetTile.type === 'wall') return;
