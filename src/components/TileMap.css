@@ -1,0 +1,35 @@
+.tilemap-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  background: rgba(12, 12, 14, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tilemap {
+  display: grid;
+  gap: 0;
+  border: 4px solid #1f1f23;
+  border-radius: 6px;
+  background-color: #0c0c0e;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.tilemap-loading {
+  color: #00ff66;
+  font-family: 'Consolas', monospace;
+  font-size: 1.2rem;
+  text-shadow: 0 0 5px #00ff66;
+  animation: pulse 1.5s infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}

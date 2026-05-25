@@ -1,0 +1,499 @@
+/* Cyber retro terminal style for App */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #09090b;
+  color: #e1e4e8;
+  font-family: 'Consolas', 'Courier New', Courier, monospace;
+  height: 100vh;
+  overflow: hidden; /* Completely prevent page vertical scroll */
+}
+
+#root {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.app-container.retro-theme {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0.5rem;
+}
+
+.app-header {
+  text-align: center;
+  width: 100%;
+  height: 52px;
+  box-sizing: border-box;
+}
+
+.app-header h1 {
+  font-size: 1.6rem;
+  margin: 0 0 2px 0;
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 102, 0.4), 0 0 15px rgba(0, 255, 102, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.app-header p {
+  color: #888;
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.app-main {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .app-main {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+
+/* Left Column: Map & Controls */
+.game-left-col {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  gap: 0.5rem;
+  box-sizing: border-box;
+}
+
+/* Right Column: Stats & Logs */
+.game-right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 320px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto; /* Scroll stats column if height exceeds viewport */
+  padding-right: 4px;
+}
+
+/* Scrollbar for right column */
+.game-right-col::-webkit-scrollbar {
+  width: 4px;
+}
+.game-right-col::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+.game-right-col::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 2px;
+}
+
+/* Panel Design */
+.panel {
+  background: rgba(18, 18, 22, 0.7);
+  border: 1.5px solid #27272a;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+.panel-title {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  color: #00ff66;
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+  border-bottom: 1px solid #27272a;
+  padding-bottom: 0.5rem;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Stats panel items */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #71717a;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.stat-value.level {
+  color: #ff00ff;
+  text-shadow: 0 0 3px rgba(255, 0, 255, 0.4);
+}
+
+.stat-value.gold {
+  color: #ffb300;
+  text-shadow: 0 0 3px rgba(255, 179, 0, 0.4);
+}
+
+.stat-value.floor {
+  color: #00d2ff;
+  text-shadow: 0 0 3px rgba(0, 210, 255, 0.4);
+}
+
+/* Progress bar (HP & XP) */
+.bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.bar-bg {
+  height: 12px;
+  background-color: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.bar-fill.hp {
+  background: linear-gradient(90deg, #ff3b30, #00ff66);
+  box-shadow: 0 0 8px rgba(0, 255, 102, 0.4);
+}
+
+.bar-fill.xp {
+  background: linear-gradient(90deg, #0088ff, #00ffff);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+}
+
+/* Inventory Display */
+.inventory-list {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.inventory-slot {
+  flex: 1;
+  background: #09090b;
+  border: 1px dashed #3f3f46;
+  border-radius: 8px;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #71717a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.inventory-slot.equipped {
+  border: 1px solid #00d2ff;
+  color: #fff;
+  background: rgba(0, 210, 255, 0.05);
+}
+
+.equip-icon {
+  font-size: 1.2rem;
+}
+
+/* Log Panel */
+.log-container {
+  height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  padding-right: 0.5rem;
+}
+
+/* Custom scrollbar for logs */
+.log-container::-webkit-scrollbar {
+  width: 4px;
+}
+.log-container::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+}
+.log-container::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 2px;
+}
+
+.log-entry {
+  line-height: 1.4;
+  color: #a1a1aa;
+  border-left: 2px solid #27272a;
+  padding-left: 0.5rem;
+}
+
+.log-entry.damage-dealt {
+  color: #00ff66;
+  border-left-color: #00ff66;
+}
+
+.log-entry.damage-taken {
+  color: #ff3b30;
+  border-left-color: #ff3b30;
+}
+
+.log-entry.item-pickup {
+  color: #00ffff;
+  border-left-color: #00ffff;
+}
+
+.log-entry.level-up {
+  color: #ff00ff;
+  border-left-color: #ff00ff;
+  font-weight: bold;
+}
+
+.log-entry.system {
+  color: #ffd700;
+  border-left-color: #ffd700;
+}
+
+/* Legend Box */
+.legend-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #a1a1aa;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-symbol {
+  font-weight: bold;
+  font-size: 0.9rem;
+  width: 16px;
+  text-align: center;
+}
+
+/* Virtual Controller (D-pad) */
+.dpad-container {
+  display: grid;
+  grid-template-columns: repeat(3, 60px);
+  grid-template-rows: repeat(3, 60px);
+  gap: 8px;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.dpad-btn {
+  background: rgba(39, 39, 42, 0.6);
+  border: 1px solid #3f3f46;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dpad-btn:hover {
+  background: #3f3f46;
+  border-color: #52525b;
+}
+
+.dpad-btn:active {
+  background: #00ff66;
+  color: #09090b;
+  border-color: #00ff66;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+}
+
+.dpad-btn.empty {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.dpad-btn.wait {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.dpad-btn.wait:active {
+  background: #ffd700;
+  border-color: #ffd700;
+  color: #000;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* Game Over / Victory Overlay Screen */
+.overlay-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(9, 9, 11, 0.9);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.overlay-title {
+  font-size: 3rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+}
+
+.overlay-title.gameover {
+  color: #ff3b30;
+  text-shadow: 0 0 15px rgba(255, 59, 48, 0.5);
+}
+
+.overlay-title.victory {
+  color: #00ff66;
+  text-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
+}
+
+.overlay-stats {
+  font-size: 1.1rem;
+  color: #a1a1aa;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.overlay-stats span strong {
+  color: #fff;
+}
+
+.action-btn {
+  background: #09090b;
+  border: 2px solid #00ff66;
+  color: #00ff66;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: bold;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+}
+
+.action-btn:hover {
+  background: #00ff66;
+  color: #09090b;
+  box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+}
+
+.action-btn.reset-panel {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border: 1px solid #71717a;
+  color: #71717a;
+}
+
+.action-btn.reset-panel:hover {
+  border-color: #ff3b30;
+  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.05);
+  box-shadow: none;
+}
+
+/* Panel Tab Switches */
+.panel-tabs {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.panel-tab-btn {
+  flex: 1;
+  background: rgba(18, 18, 22, 0.7);
+  border: 1.5px solid #27272a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.panel-tab-btn:hover {
+  border-color: #3f3f46;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.panel-tab-btn.active {
+  background: rgba(0, 255, 102, 0.08);
+  border-color: #00ff66;
+  color: #00ff66;
+  text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+}
+
