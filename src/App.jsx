@@ -343,7 +343,8 @@ function App() {
       status: { x: 460, y: 10, width: 280, height: 320, zIndex: 10, visible: true },
       logs: { x: 750, y: 10, width: 330, height: 200, zIndex: 10, visible: true },
       legend: { x: 750, y: 220, width: 330, height: 180, zIndex: 10, visible: true },
-      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false }
+      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false },
+      settings: { x: 200, y: 150, width: 400, height: 400, zIndex: 10, visible: false }
     };
   });
 
@@ -388,7 +389,8 @@ function App() {
       status: { x: 460, y: 10, width: 280, height: 320, zIndex: 10, visible: true },
       logs: { x: 750, y: 10, width: 330, height: 200, zIndex: 10, visible: true },
       legend: { x: 750, y: 220, width: 330, height: 180, zIndex: 10, visible: true },
-      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false }
+      wordlist: { x: 100, y: 50, width: 560, height: 380, zIndex: 5, visible: false },
+      settings: { x: 200, y: 150, width: 400, height: 400, zIndex: 10, visible: false }
     };
     setWindows(defaults);
     localStorage.setItem('learning_rpg_windows', JSON.stringify(defaults));
@@ -1141,6 +1143,140 @@ function App() {
       <div className="legend-item"><span className="legend-symbol tile-stairs">&gt;</span><span>階段</span></div>
     </div>
   );
+  // ==============================
+  // Settings & System Handlers
+  // ==============================
+  
+  const handleExportSave = () => {
+    const data = {
+      learning_rpg_windows: localStorage.getItem('learning_rpg_windows'),
+      learning_rpg_stats: localStorage.getItem('learning_rpg_stats'),
+      learning_rpg_custom_questions: localStorage.getItem('learning_rpg_custom_questions')
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `learning_rpg_save_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportSave = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.learning_rpg_windows) localStorage.setItem('learning_rpg_windows', data.learning_rpg_windows);
+        if (data.learning_rpg_stats) localStorage.setItem('learning_rpg_stats', data.learning_rpg_stats);
+        if (data.learning_rpg_custom_questions) localStorage.setItem('learning_rpg_custom_questions', data.learning_rpg_custom_questions);
+        alert('セーブデータを読み込みました！ページを更新します。');
+        window.location.reload();
+      } catch (err) {
+        alert('セーブデータの読み込みに失敗しました。');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split('\n');
+        const customQuestions = [];
+        // Expected format: id,category,type,question,answer,choices(comma separated if choice type)
+        // Skip header if first line contains "id"
+        let startIndex = lines[0].toLowerCase().includes('id') ? 1 : 0;
+        
+        for (let i = startIndex; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          const parts = line.split(',');
+          if (parts.length < 5) continue;
+          
+          const type = parts[2].trim();
+          const qObj = {
+            id: parseInt(parts[0].trim()) || (1000 + i),
+            category: parts[1].trim(),
+            type: type,
+            question: parts[3].trim(),
+            answer: parts[4].trim(),
+          };
+          
+          if (type === 'choice' && parts.length >= 8) {
+            qObj.choices = [parts[4].trim(), parts[5].trim(), parts[6].trim(), parts[7].trim()];
+          }
+          
+          customQuestions.push(qObj);
+        }
+        
+        const existingCustom = JSON.parse(localStorage.getItem('learning_rpg_custom_questions') || '[]');
+        const updatedCustom = [...existingCustom, ...customQuestions];
+        localStorage.setItem('learning_rpg_custom_questions', JSON.stringify(updatedCustom));
+        
+        alert(`カスタム問題を ${customQuestions.length} 問追加しました！`);
+      } catch (err) {
+        alert('CSVの読み込みに失敗しました。');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const renderSettingsContent = () => {
+    let stats = {};
+    try {
+      stats = JSON.parse(localStorage.getItem('learning_rpg_stats') || '{}');
+    } catch(e) {}
+    
+    return (
+      <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#09090b', color: '#e4e4e7' }}>
+        <h3 style={{ margin: 0, color: '#facc15' }}>💾 セーブ＆ロード</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleExportSave} style={{ flex: 1, padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            📥 セーブ書き出し
+          </button>
+          <label style={{ flex: 1, padding: '8px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
+            📤 セーブ読み込み
+            <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportSave} />
+          </label>
+        </div>
+        
+        <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>📝 カスタム問題の追加 (CSV)</h3>
+        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 5px' }}>
+          フォーマット: ID, カテゴリ, type(choice/input), 問題文, 正解, ダミー1, ダミー2, ダミー3
+        </p>
+        <label style={{ padding: '8px', background: '#9333ea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
+          📄 CSVファイルを読み込む
+          <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImportCSV} />
+        </label>
+
+        <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>📊 成績・学習記録</h3>
+        {Object.keys(stats).length === 0 ? (
+          <div style={{ fontSize: '0.85rem', color: '#71717a' }}>まだ記録がありません。クイズに答えよう！</div>
+        ) : (
+          <div style={{ fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
+            {Object.entries(stats).map(([qId, s]) => {
+              const total = s.correct + s.incorrect;
+              const rate = total > 0 ? Math.round((s.correct / total) * 100) : 0;
+              return (
+                <div key={qId} style={{ background: '#18181b', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
+                  <span>Q-ID: {qId}</span>
+                  <span>正解: {s.correct} / 不正解: {s.incorrect} ({rate}%)</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderWordListContent = () => (
     <WordListPanel 
@@ -1739,6 +1875,12 @@ function App() {
               📖 DECK & WORDS ({Object.keys(learnedWords).length})
             </button>
             <button 
+              className={`control-btn ${windows.settings?.visible ? 'active' : ''}`}
+              onClick={() => toggleWindow('settings')}
+            >
+              ⚙️ SETTINGS
+            </button>
+            <button 
               className="control-btn reset-layout-btn"
               onClick={resetWindows}
             >
@@ -1777,6 +1919,7 @@ function App() {
             {renderWindow('logs', 'Action Logs', renderLogsContent())}
             {renderWindow('legend', 'Legend & Key', renderLegendContent())}
             {renderWindow('wordlist', 'Deck & Learning Settings', renderWordListContent())}
+            {windows.settings && renderWindow('settings', 'System & Stats', renderSettingsContent())}
           </div>
         )}
       </main>

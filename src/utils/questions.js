@@ -612,15 +612,29 @@ export const QUESTIONS_DB = [
 ];
 
 // =============================
+// カスタム問題の取得
+// =============================
+export const getCustomQuestions = () => {
+  try {
+    const data = localStorage.getItem('learning_rpg_custom_questions');
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+// =============================
 // ランダムに問題を1つ選ぶ
 // reviewIds: まちがえた問題のID一覧（30%の確率で再出題）
 // =============================
 export const getRandomQuestion = (floor = 1, reviewIds = []) => {
   let selected;
+  const customQuestions = getCustomQuestions();
+  const allQuestions = [...QUESTIONS_DB, ...customQuestions];
 
   // 30%の確率でまちがえた問題を再出題
   if (reviewIds.length > 0 && Math.random() < 0.3) {
-    const reviewPool = QUESTIONS_DB.filter(q => reviewIds.includes(q.id));
+    const reviewPool = allQuestions.filter(q => reviewIds.includes(q.id));
     if (reviewPool.length > 0) {
       selected = reviewPool[Math.floor(Math.random() * reviewPool.length)];
     }
@@ -628,7 +642,7 @@ export const getRandomQuestion = (floor = 1, reviewIds = []) => {
 
   // それ以外はランダム
   if (!selected) {
-    selected = QUESTIONS_DB[Math.floor(Math.random() * QUESTIONS_DB.length)];
+    selected = allQuestions[Math.floor(Math.random() * allQuestions.length)];
   }
 
   // 4択の場合は選択肢をシャッフル

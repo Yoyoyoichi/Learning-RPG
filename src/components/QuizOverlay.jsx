@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { checkAnswer } from '../utils/questions';
+import { recordAnswer } from '../utils/stats';
 import { playCorrectSound, playIncorrectSound } from '../utils/sound';
 import './QuizOverlay.css';
 
@@ -29,6 +30,8 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     if (answered) return;
     const isCorrect = choice === questionObj.answer;
     setAnswered({ selected: choice, isCorrect });
+    recordAnswer(questionObj.id, isCorrect);
+    
     if (isCorrect) {
       playCorrectSound();
       setTimeout(() => onCorrect(), 900);
@@ -137,6 +140,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 
     const isCorrect = checkAnswer(inputValue, questionObj);
     setAnswered({ isCorrect });
+    recordAnswer(questionObj.id, isCorrect);
 
     if (isCorrect) {
       playCorrectSound();
