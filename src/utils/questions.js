@@ -4,7 +4,7 @@
 // type: 'input'  → 入力クイズ（カタカナ or 数字）
 // =============================
 
-export const QUESTIONS_DB = [
+export let QUESTIONS_DB = [
   // ========== 県庁所在地（4択） ==========
   {
     id: 1, category: "県庁所在地", type: "choice",
@@ -611,6 +611,10 @@ export const QUESTIONS_DB = [
   },
 ];
 
+export const setDefaultQuestions = (data) => {
+  QUESTIONS_DB = data;
+};
+
 // =============================
 // カスタム問題の取得
 // =============================
@@ -630,7 +634,7 @@ export const getCustomQuestions = () => {
 export const getRandomQuestion = (floor = 1, reviewIds = []) => {
   let selected;
   const customQuestions = getCustomQuestions();
-  const allQuestions = [...QUESTIONS_DB, ...customQuestions];
+  const allQuestions = customQuestions.length > 0 ? customQuestions : QUESTIONS_DB;
 
   // 30%の確率でまちがえた問題を再出題
   if (reviewIds.length > 0 && Math.random() < 0.3) {

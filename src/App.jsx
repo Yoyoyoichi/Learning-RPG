@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
-import { getRandomQuestion } from './utils/questions';
+import { getRandomQuestion, setDefaultQuestions } from './utils/questions';
+import { generateFloorStory } from './utils/gemini';
+import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
 import {
   generateStarterDeck,
@@ -317,7 +319,40 @@ function App() {
   const [customWords, setCustomWords] = useState([]);
   const [learnedWords, setLearnedWords] = useState({});
   const [activeQuiz, setActiveQuiz] = useState(null);
+  const [floorStory, setFloorStory] = useState(null);
+  const [isStoryLoading, setIsStoryLoading] = useState(false);
   const [rightTab, setRightTab] = useState('status'); // 'status' or 'wordlist'
+  
+  const roomDescriptionsRef = useRef([]);
+  const visitedRoomsRef = useRef(new Set());
+  const mapMessageTimerRef = useRef(null);
+  const [mapMessage, setMapMessage] = useState(null);
+  const [isEnemyTurn, setIsEnemyTurn] = useState(false);
+  const [enemyActionText, setEnemyActionText] = useState("");
+  const [screenShake, setScreenShake] = useState(false);
+
+  useEffect(() => {
+    fetch('/default_questions.csv')
+      .then(res => res.text())
+      .then(csvText => {
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const formatted = results.data.map(row => ({
+              id: parseInt(row.id) || Date.now(),
+              category: row.category,
+              type: row.type || 'choice',
+              question: row.question,
+              answer: row.answer,
+              choices: row.type === 'choice' ? [row.answer, row.dummy1, row.dummy2, row.dummy3].filter(Boolean) : undefined,
+            }));
+            setDefaultQuestions(formatted);
+          }
+        });
+      })
+      .catch(e => console.error(e));
+  }, []);
 
   const logEndRef = useRef(null);
   const [showDpad, setShowDpad] = useState(false);
@@ -556,6 +591,35 @@ function App() {
   };
 
   const handleEndTurn = () => {
+    if (gameOver || gameVictory || activeQuiz || !battle || isEnemyTurn) return;
+    
+    const intent = battle.enemyIntent;
+    let actionText = "敵のターン...";
+    if (intent) {
+      if (intent.damage && intent.block) {
+        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ ＆ ${intent.block} ブロック！`;
+      } else if (intent.damage) {
+        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ！`;
+      } else if (intent.block) {
+        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.block} ブロック！`;
+      } else {
+        actionText = `${battle.enemy.name} は様子を見ている...`;
+      }
+    }
+    setEnemyActionText(actionText);
+    setIsEnemyTurn(true);
+  };
+
+  useEffect(() => {
+    if (isEnemyTurn && battle) {
+      const timer = setTimeout(() => {
+        resolveEnemyTurn();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isEnemyTurn, battle]);
+
+  const resolveEnemyTurn = () => {
     if (gameOver || gameVictory || activeQuiz || !battle) return;
     
     let nextBattle = { ...battle };
@@ -585,6 +649,8 @@ function App() {
           nextPlayer.hp = Math.max(0, nextPlayer.hp - finalDmg);
           addLog(`プレイヤーは ${finalDmg} ダメージを受けた！`, 'damage-taken');
           playHurtSound();
+          setScreenShake(true);
+          setTimeout(() => setScreenShake(false), 400);
           
           if (nextPlayer.hp <= 0) {
             setGameOver(true);
@@ -635,6 +701,7 @@ function App() {
     
     setBattle(nextBattle);
     setPlayer(nextPlayer);
+    setIsEnemyTurn(false);
   };
 
   const renderBattleContent = () => {
@@ -662,18 +729,26 @@ function App() {
     };
 
     return (
-      <div className="battle-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#09090b', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#f3f4f6', gap: '6px' }}>
+      <div className="battle-screen" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#09090b', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#f3f4f6', gap: '6px' }}>
+        
+        {isEnemyTurn && (
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
+             <h2 style={{ color: '#ff3e3e', textShadow: '2px 2px 0 #000', fontSize: '1.8rem', animation: 'pulse 1s infinite', letterSpacing: '1px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+               {enemyActionText}
+             </h2>
+          </div>
+        )}
         
         {/* Arena */}
         <div className="battle-arena" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: '130px', padding: '4px', borderBottom: '1px dashed #27272a' }}>
           
           {/* Player */}
           <div className="battle-character player-side" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '45%' }}>
-            <div style={{ fontSize: '2.2rem', marginBottom: '2px' }}>🛡️👤</div>
-            <div style={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#ff3e3e' }}>ゆうしゃ</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>🛡️👤</div>
+            <div style={{ fontWeight: 'bold', fontSize: '1.0rem', color: '#ff3e3e' }}>ゆうしゃ</div>
             
             <div style={{ width: '100%', marginTop: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '1px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {player.hp} / {player.maxHp}</span>
                 {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {playerBlock}</span>}
               </div>
@@ -684,18 +759,18 @@ function App() {
           </div>
 
           {/* Turn Marker */}
-          <div style={{ fontSize: '0.65rem', color: '#71717a', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.8rem', color: '#71717a', textAlign: 'center' }}>
             <div>ターン</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#ff3e3e' }}>{turn}</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#ff3e3e' }}>{turn}</div>
           </div>
 
           {/* Enemy */}
           <div className="battle-character enemy-side" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '45%' }}>
-            <div style={{ fontSize: '2.2rem', marginBottom: '2px' }}>{getEnemySprite(enemy.subType)}</div>
-            <div style={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#f87171' }}>{enemy.name}</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>{getEnemySprite(enemy.subType)}</div>
+            <div style={{ fontWeight: 'bold', fontSize: '1.0rem', color: '#f87171' }}>{enemy.name}</div>
             
             <div style={{ width: '100%', marginTop: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '1px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {enemy.hp} / {enemy.maxHp}</span>
                 {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {enemyBlock}</span>}
               </div>
@@ -705,7 +780,7 @@ function App() {
             </div>
 
             {enemyIntent && (
-              <div style={{ marginTop: '4px', background: '#1c1917', border: '1px solid #44403c', borderRadius: '4px', padding: '1px 4px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem' }} title={enemyIntent.text}>
+              <div style={{ marginTop: '4px', background: '#1c1917', border: '1px solid #44403c', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }} title={enemyIntent.text}>
                 <span>{getIntentionIcon(enemyIntent)}</span>
                 <span style={{ color: '#d6d3d1' }}>{enemyIntent.name}</span>
                 <span style={{ color: '#f87171', fontWeight: 'bold' }}>
@@ -718,9 +793,15 @@ function App() {
 
         </div>
 
-        {/* Feedback / Instructions */}
-        <div style={{ textAlign: 'center', fontSize: '0.68rem', color: '#71717a', minHeight: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span>カードをえらんで、えいたんごクイズにこたえよう！</span>
+        {/* Battle Logs / Feedback */}
+        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '4px', padding: '6px 8px', height: '48px', overflowY: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', fontSize: '0.85rem', gap: '3px' }}>
+          {logs.length > 0 ? logs.slice(-2).map((log, i) => (
+            <div key={i} style={{ color: log.type === 'damage-taken' ? '#ef4444' : log.type === 'damage-dealt' ? '#60a5fa' : log.type === 'level-up' ? '#fbbf24' : '#a1a1aa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animation: 'fadeIn 0.2s' }}>
+              &gt; {log.text}
+            </div>
+          )) : (
+            <div style={{ color: '#71717a', textAlign: 'center' }}>カードをえらんで、クイズにこたえよう！</div>
+          )}
         </div>
 
         {/* Card Hand and Turn controls */}
@@ -750,12 +831,12 @@ function App() {
                   }}
                 >
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#fca5a5' : '#93c5fd' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#fca5a5' : '#93c5fd' }}>
                         {card.name}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.55rem', color: '#9ca3af', lineHeight: '1.2', maxHeight: '55px', overflow: 'hidden', wordBreak: 'break-all' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
                       {card.desc}
                     </div>
                   </div>
@@ -768,14 +849,14 @@ function App() {
             <button
               onClick={handleEndTurn}
               style={{
-                padding: '4px 10px',
+                padding: '6px 12px',
                 background: '#ef4444',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
-                fontSize: '0.72rem',
+                fontSize: '0.9rem',
               }}
             >
               ターン終了
@@ -1043,8 +1124,28 @@ function App() {
           {showDpad ? '🎮 パッド非表示' : '🎮 パッド表示'}
         </button>
       </div>
-      <div className="map-container-wrapper">
+      <div className="map-container-wrapper" style={{ position: 'relative' }}>
         <TileMap grid={renderGrid} />
+        {mapMessage && (
+          <div style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.85)',
+            border: '1px solid #ff3e3e',
+            color: '#fff',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            zIndex: 100,
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(255,62,62,0.2)',
+            pointerEvents: 'none',
+            minWidth: '200px'
+          }}>
+            <span style={{ fontStyle: 'italic', fontSize: '0.85rem', lineHeight: '1.4' }}>{mapMessage}</span>
+          </div>
+        )}
       </div>
       <div className="controls-wrapper" style={{ width: '100%' }}>
         {showDpad ? (
@@ -1426,6 +1527,15 @@ function App() {
 
   // Initialize/Restart Game
   const startNewGame = () => {
+    setIsStoryLoading(true);
+    setFloorStory(null);
+    generateFloorStory(1).then(data => {
+      setFloorStory(data.story);
+      roomDescriptionsRef.current = data.rooms || [];
+      visitedRoomsRef.current = new Set();
+      setIsStoryLoading(false);
+    });
+
     const dungeon = generateDungeon(1);
     setGrid(dungeon.grid);
     setRooms(dungeon.rooms);
@@ -1457,6 +1567,15 @@ function App() {
 
   // Set up next floor
   const loadNextFloor = (nextFloorNum) => {
+    setIsStoryLoading(true);
+    setFloorStory(null);
+    generateFloorStory(nextFloorNum).then(data => {
+      setFloorStory(data.story);
+      roomDescriptionsRef.current = data.rooms || [];
+      visitedRoomsRef.current = new Set();
+      setIsStoryLoading(false);
+    });
+
     const dungeon = generateDungeon(nextFloorNum);
     setGrid(dungeon.grid);
     setRooms(dungeon.rooms);
@@ -1727,6 +1846,23 @@ function App() {
       nextPlayer.y = ty;
       playMoveSound();
 
+      // 新しい部屋に入ったかチェックして描写を出す
+      const currentRoomIndex = rooms.findIndex(r => 
+        tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h
+      );
+      if (currentRoomIndex !== -1 && !visitedRoomsRef.current.has(currentRoomIndex)) {
+        visitedRoomsRef.current.add(currentRoomIndex);
+        if (roomDescriptionsRef.current.length > 0) {
+          const desc = roomDescriptionsRef.current.shift();
+          addLog(`【部屋】 ${desc}`, 'system');
+          setMapMessage(desc);
+          if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
+          mapMessageTimerRef.current = setTimeout(() => {
+            setMapMessage(null);
+          }, 4000);
+        }
+      }
+
       if (targetTile.type === 'stairs') {
         if (nextPlayer.floor === 10) {
           setGameVictory(true);
@@ -1865,7 +2001,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
 
   const VIEWPORT_RADIUS = 10;
   const renderGrid = [];
@@ -1911,7 +2047,7 @@ function App() {
   }
 
   return (
-    <div className="app-container retro-theme">
+    <div className={`app-container retro-theme ${screenShake ? 'shake-effect flash-damage' : ''}`}>
       <header className="app-header">
         <div className="header-left">
           <h1>ROGUE-TEXT RPG</h1>
@@ -1999,6 +2135,28 @@ function App() {
           </div>
         )}
       </main>
+
+      { (isStoryLoading || floorStory) && !gameOver && !gameVictory && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{ background: '#18181b', border: '1px solid #ff3e3e', padding: '30px', borderRadius: '10px', maxWidth: '500px', color: '#f3f4f6', textAlign: 'center', boxShadow: '0 0 20px rgba(255, 62, 62, 0.3)' }}>
+            <h2 style={{ color: '#ff3e3e', marginBottom: '20px' }}>第 {player.floor} 階層</h2>
+            <div style={{ minHeight: '100px', marginBottom: '20px', fontSize: '1.1rem', lineHeight: '1.6' }}>
+              {isStoryLoading ? (
+                <span style={{ color: '#a1a1aa', fontStyle: 'italic' }}>Geminiがストーリーを生成中...<br/>(APIキー未設定の場合はすぐに終わります)</span>
+              ) : (
+                floorStory
+              )}
+            </div>
+            <button
+              onClick={() => setFloorStory(null)}
+              disabled={isStoryLoading}
+              style={{ padding: '10px 30px', fontSize: '1.1rem', background: isStoryLoading ? '#3f3f46' : '#ff3e3e', color: '#fff', border: 'none', borderRadius: '5px', cursor: isStoryLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+            >
+              探索を開始する
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Game Over Screen */}
       {gameOver && (
