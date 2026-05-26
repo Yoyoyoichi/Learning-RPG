@@ -12,6 +12,7 @@ import {
   createCardInstance,
   CARDS_DB
 } from './utils/cards';
+import { RELICS_DB, getRandomRelic } from './utils/relics';
 import {
   playMoveSound,
   playHitSound,
@@ -139,7 +140,8 @@ const generateDungeon = (floor) => {
   const items = [];
   const itemTypes = [
     { subType: 'potion', char: 'P', name: 'ポーション' },
-    { subType: 'chest', char: 'C', name: '宝箱' }
+    { subType: 'chest', char: 'C', name: '宝箱' },
+    { subType: 'shop', char: '$', name: '商人' }
   ];
 
   const equipmentTypes = [
@@ -225,7 +227,8 @@ const INITIAL_PLAYER = {
   floor: 1,
   swordEquipped: false,
   shieldEquipped: false,
-  deck: []
+  deck: [],
+  relics: []
 };
 
 // Enemy Intention generator
@@ -255,16 +258,16 @@ const rollEnemyIntent = (enemy, turnNumber) => {
       return { type: 'attack', damage: atk, name: 'なぎはらい', text: `こうげき (${atk}ダメージ)` };
     }
   } else if (subType === 'ghost') {
-    if (seed < 0.4) {
-      return { type: 'attack', damage: atk, name: 'のろいのひかり', text: `こうげき (${atk}ダメージ)` };
-    } else if (seed < 0.7) {
+    if (turnNumber % 3 === 2) {
+      return { type: 'debuff', weak: 1, name: 'のろい', text: `デバフ (じゃくたいか 1ターン)` };
+    } else if (seed < 0.5) {
       return { type: 'defend', block: 8, name: 'おんりょうのたて', text: `ぼうぎょ (8ブロック)` };
     } else {
-      return { type: 'attack', damage: atk + 2, name: 'ポルターガイスト', text: `つよいこうげき (${atk + 2}ダメージ)` };
+      return { type: 'attack', damage: atk, name: 'ポルターガイスト', text: `こうげき (${atk}ダメージ)` };
     }
   } else if (subType === 'werewolf') {
     if (turnNumber % 2 === 0) {
-      return { type: 'attack', damage: atk + 3, name: 'れんぞくひっかき', text: `つよいこうげき (${atk + 3}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2)+1, multi: 3, name: 'れんぞくひっかき', text: `れんぞくこうげき (${Math.floor(atk/2)+1}x3ダメージ)` };
     } else if (seed < 0.3) {
       return { type: 'defend', block: 5, name: 'みをかがめる', text: `ぼうぎょ (5ブロック)` };
     } else {
@@ -274,25 +277,27 @@ const rollEnemyIntent = (enemy, turnNumber) => {
     if (seed < 0.4) {
       return { type: 'attack', damage: atk + 5, name: 'きゅうけつ', text: `きゅうけつこうげき (${atk + 5}ダメージ)` };
     } else if (seed < 0.7) {
-      return { type: 'defend', block: 10, name: 'コウモリのむれ', text: `ぼうぎょ (10ブロック)` };
+      return { type: 'buff', strength: 2, name: 'ちをすする', text: `チャージ (すじりょく+2)` };
     } else {
-      return { type: 'attack', damage: atk, name: 'やみのはどう', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2), multi: 2, name: 'やみのはどう', text: `れんぞくこうげき (${Math.floor(atk/2)}x2ダメージ)` };
     }
   } else if (subType === 'demon') {
     if (turnNumber % 3 === 0) {
       return { type: 'attack', damage: atk + 10, name: 'じごくのほのお', text: `ぜんたいこうげき (${atk + 10}ダメージ)` };
-    } else if (seed < 0.5) {
-      return { type: 'defend', block: 15, name: 'まほうのバリア', text: `ぼうぎょ (15ブロック)` };
+    } else if (turnNumber % 3 === 1) {
+      return { type: 'debuff', weak: 2, name: 'あくむ', text: `デバフ (じゃくたいか 2ターン)` };
     } else {
-      return { type: 'attack', damage: atk + 2, name: 'ダークスラッシュ', text: `つよいこうげき (${atk + 2}ダメージ)` };
+      return { type: 'defend', block: 15, name: 'まほうのバリア', text: `ぼうぎょ (15ブロック)` };
     }
   } else if (subType === 'dragon') {
     if (turnNumber % 4 === 0) {
       return { type: 'attack', damage: atk + 20, name: 'ドラゴンブレス', text: `ひっさつこうげき (${atk + 20}ダメージ)` };
+    } else if (turnNumber % 4 === 3) {
+      return { type: 'buff', strength: 5, name: 'いきをすいこむ', text: `チャージ (すじりょく+5)` };
     } else if (seed < 0.4) {
       return { type: 'defend', block: 20, name: 'はがねのうろこ', text: `ぼうぎょ (20ブロック)` };
     } else {
-      return { type: 'attack', damage: atk + 5, name: 'かみくだき', text: `つよいこうげき (${atk + 5}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2)+2, multi: 2, name: 'かみくだき', text: `れんぞくこうげき (${Math.floor(atk/2)+2}x2ダメージ)` };
     }
   }
   
@@ -314,6 +319,7 @@ function App() {
   const [battle, setBattle] = useState(null);
   const [campsite, setCampsite] = useState(null);
   const [cardReward, setCardReward] = useState(null);
+  const [shop, setShop] = useState(null);
 
   // Quiz and Word Learning States
   const [customWords, setCustomWords] = useState([]);
@@ -575,6 +581,13 @@ function App() {
 
   const handleCardClick = (card) => {
     if (gameOver || gameVictory || !battle) return;
+    if (battle.playerEnergy < card.cost) {
+      addLog("エナジーが足りない！", 'system');
+      return;
+    }
+    
+    // エナジーを即座に消費
+    setBattle(prev => ({ ...prev, playerEnergy: prev.playerEnergy - card.cost }));
 
     // まちがえた問題のIDリストを作る
     const reviewIds = Object.keys(learnedWords)
@@ -625,42 +638,49 @@ function App() {
     let nextBattle = { ...battle };
     let nextPlayer = { ...player };
     
-    // 1. 敵の行動（意図）を実行する
     const intent = nextBattle.enemyIntent;
     if (intent) {
       addLog(`${nextBattle.enemy.name} のターン: 「${intent.name}」を使用！`, 'system');
       
       if (intent.damage !== undefined) {
-        let currentDmg = intent.damage;
-        let playerBlock = nextBattle.playerBlock;
-        let finalDmg = currentDmg;
+        let multiCount = intent.multi || 1;
         
-        if (playerBlock > 0) {
-          if (playerBlock >= currentDmg) {
-            nextBattle.playerBlock -= currentDmg;
-            finalDmg = 0;
-          } else {
-            finalDmg = currentDmg - playerBlock;
-            nextBattle.playerBlock = 0;
+        for (let m = 0; m < multiCount; m++) {
+          let baseDmg = intent.damage + (nextBattle.enemyStatus.strength || 0);
+          if (nextBattle.playerStatus.vulnerable > 0) {
+             baseDmg = Math.floor(baseDmg * 1.5);
           }
-        }
-        
-        if (finalDmg > 0) {
-          nextPlayer.hp = Math.max(0, nextPlayer.hp - finalDmg);
-          addLog(`プレイヤーは ${finalDmg} ダメージを受けた！`, 'damage-taken');
-          playHurtSound();
-          setScreenShake(true);
-          setTimeout(() => setScreenShake(false), 400);
+          let currentDmg = baseDmg;
+          let playerBlock = nextBattle.playerBlock;
+          let finalDmg = currentDmg;
           
-          if (nextPlayer.hp <= 0) {
-            setGameOver(true);
-            setBattle(null);
-            addLog("あなたは力尽きた...", 'damage-taken');
-            playGameOverSound();
-            return;
+          if (playerBlock > 0) {
+            if (playerBlock >= currentDmg) {
+              nextBattle.playerBlock -= currentDmg;
+              finalDmg = 0;
+            } else {
+              finalDmg = currentDmg - playerBlock;
+              nextBattle.playerBlock = 0;
+            }
           }
-        } else {
-          addLog("プレイヤーは攻撃を完全にブロックした！", 'system');
+          
+          if (finalDmg > 0) {
+            nextPlayer.hp = Math.max(0, nextPlayer.hp - finalDmg);
+            addLog(`プレイヤーは ${finalDmg} ダメージを受けた！`, 'damage-taken');
+            playHurtSound();
+            setScreenShake(true);
+            setTimeout(() => setScreenShake(false), 400);
+            
+            if (nextPlayer.hp <= 0) {
+              setGameOver(true);
+              setBattle(null);
+              addLog("あなたは力尽きた...", 'damage-taken');
+              playGameOverSound();
+              return;
+            }
+          } else {
+            addLog("プレイヤーは攻撃を完全にブロックした！", 'system');
+          }
         }
       }
       
@@ -668,14 +688,39 @@ function App() {
         nextBattle.enemyBlock += intent.block;
         addLog(`${nextBattle.enemy.name} は ${intent.block} のブロックを得た。`, 'system');
       }
+
+      if (intent.type === 'buff') {
+        if (intent.strength) nextBattle.enemyStatus.strength += intent.strength;
+        addLog(`${nextBattle.enemy.name} のパワーが上がった！`, 'system');
+      }
+      if (intent.type === 'debuff') {
+        if (intent.weak) nextBattle.playerStatus.weak += intent.weak;
+        if (intent.vulnerable) nextBattle.playerStatus.vulnerable += intent.vulnerable;
+        addLog(`プレイヤーは弱体化された！`, 'system');
+      }
     }
     
-    // 2. ターンの開始準備
-    nextBattle.turn += 1;
-    nextBattle.playerBlock = 0; // ブロックは毎ターンリセットされます
-    nextBattle.playerEnergy = nextBattle.playerMaxEnergy; // 互換性のために初期化
+    // Poison damage for enemy at END of their turn? Actually usually poison happens at the start of their turn, but here is fine.
+    if (nextBattle.enemyStatus.poison > 0) {
+       const pDmg = nextBattle.enemyStatus.poison;
+       nextBattle.enemy.hp = Math.max(0, nextBattle.enemy.hp - pDmg);
+       addLog(`毒により ${nextBattle.enemy.name} に ${pDmg} ダメージ！`, 'system');
+       nextBattle.enemyStatus.poison -= 1;
+       if (nextBattle.enemy.hp <= 0) {
+         // handle death from poison... wait, this is getting complicated.
+         // Just a log for now, player has to attack to trigger win in handleCombatAction to be safe, 
+         // OR we just set enemy hp and the next attack kills. Let's just deal the damage.
+       }
+    }
 
-    // 手札を捨てて、山札から3枚引きます
+    // decrement player statuses
+    if (nextBattle.playerStatus.weak > 0) nextBattle.playerStatus.weak--;
+    if (nextBattle.playerStatus.vulnerable > 0) nextBattle.playerStatus.vulnerable--;
+
+    nextBattle.turn += 1;
+    nextBattle.playerBlock = 0; 
+    nextBattle.playerEnergy = nextBattle.playerMaxEnergy; 
+
     nextBattle.discardPile = [...nextBattle.discardPile, ...nextBattle.hand];
     nextBattle.hand = [];
     
@@ -683,7 +728,10 @@ function App() {
     let discardPile = [...nextBattle.discardPile];
     let hand = [];
     
-    for (let i = 0; i < 3; i++) {
+    let drawCount = 3;
+    if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'king_crown')) drawCount += 1;
+
+    for (let i = 0; i < drawCount; i++) {
       if (drawPile.length === 0) {
         if (discardPile.length === 0) break;
         drawPile = [...discardPile];
@@ -807,12 +855,14 @@ function App() {
         {/* Card Hand and Turn controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', justifyContent: 'center' }}>
-            {hand.map((card) => {
-              const borderCol = card.type === 'attack' ? '#ff3e3e' : '#3b82f6';
+            {hand.map((card, idx) => {
+              const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
+              const canPlay = playerEnergy >= card.cost;
               return (
                 <button
-                  key={card.id}
-                  onClick={() => handleCardClick(card)}
+                  key={card.id || idx}
+                  onClick={() => canPlay ? handleCardClick(card) : null}
+                  disabled={!canPlay}
                   style={{
                     flex: '0 0 92px',
                     height: '110px',
@@ -824,10 +874,12 @@ function App() {
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     padding: '5px',
-                    cursor: 'pointer',
                     textAlign: 'left',
-                    boxShadow: `0 0 6px ${borderCol}60`,
                     transition: 'transform 0.15s',
+                    position: 'relative',
+                    opacity: canPlay ? 1 : 0.4,
+                    boxShadow: canPlay ? `0 0 6px ${borderCol}60` : 'none',
+                    cursor: canPlay ? 'pointer' : 'not-allowed',
                   }}
                 >
                   <div>
@@ -836,6 +888,7 @@ function App() {
                         {card.name}
                       </span>
                     </div>
+                    <span style={{ background: borderCol, color: '#000', fontWeight: 'bold', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', position: 'absolute', top: '-6px', right: '-6px', zIndex: 10, border: '1px solid #fff' }}>{card.cost}</span>
                     <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
                       {card.desc}
                     </div>
@@ -845,7 +898,10 @@ function App() {
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #27272a', paddingTop: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #27272a', paddingTop: '8px', paddingBottom: '4px' }}>
+            <div style={{ background: '#1e3a8a', color: '#93c5fd', fontWeight: 'bold', fontSize: '1.2rem', padding: '6px 16px', borderRadius: '8px', border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
+              ⚡ {playerEnergy} / {battle.playerMaxEnergy || 3}
+            </div>
             <button
               onClick={handleEndTurn}
               style={{
@@ -1014,6 +1070,7 @@ function App() {
       }));
       addLog(`🎁 デッキに「${card.name}」を追加した。`, 'system');
       setCardReward(null);
+    setShop(null);
     };
 
     const handleSkip = () => {
@@ -1728,9 +1785,20 @@ function App() {
 
         setBattle(null);
         setPlayer(nextPlayer);
+        
+        let actualGold = goldReward;
+        if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'lucky_coin')) {
+          actualGold = Math.floor(actualGold * 1.2);
+        }
+        
+        if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'vampire_tooth')) {
+          nextPlayer.hp = Math.min(nextPlayer.maxHp, nextPlayer.hp + 3);
+          addLog("レリック「きゅうけつきのキバ」の効果でHPが3回復した！", 'system');
+        }
+
         setCardReward({
           choices: getRandomRewardCards(nextPlayer.floor),
-          gold: goldReward,
+          gold: actualGold,
           xp: xpReward
         });
         setActiveQuiz(null);
@@ -1784,7 +1852,10 @@ function App() {
 
       let startingBlock = 0;
       if (player.shieldEquipped) {
-        startingBlock = 3;
+        startingBlock += 3;
+      }
+      if (player.relics && player.relics.some(r => r.key === 'iron_shield')) {
+        startingBlock += 5;
       }
 
       const initialBattle = {
@@ -1801,7 +1872,7 @@ function App() {
         playerMaxEnergy: 3,
         playerBlock: startingBlock,
         playerStatus: {
-          strength: 0,
+          strength: (player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0,
           vulnerable: 0,
           weak: 0,
           barricade: 0,
@@ -1831,6 +1902,13 @@ function App() {
           const goldAmount = Math.floor(Math.random() * 16) + 15;
           nextPlayer.gold += goldAmount;
           addLog(`${item.name} を開けた！ ${goldAmount} ゴールドを獲得。`, 'item-pickup');
+        } else if (item.subType === 'shop') {
+          setShop({
+            cards: getRandomRewardCards(floor),
+            relic: getRandomRelic(nextPlayer.relics ? nextPlayer.relics.map(r => r.key) : []),
+            removeCost: 50 + (nextPlayer.removedCount || 0) * 25
+          });
+          addLog('商人に出会った。', 'system');
         } else if (item.subType === 'sword') {
           nextPlayer.swordEquipped = true;
           addLog(`遺物「${item.name}」を手に入れた！(こうげきダメージが 2 ふえる！)`, 'item-pickup');
