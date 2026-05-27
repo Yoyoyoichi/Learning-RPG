@@ -41,10 +41,12 @@ const generateDungeon = (floor) => {
 
   const rooms = [];
   const minSize = 5;
-  const maxRooms = Math.floor((COLS * ROWS) / 250); // Scale rooms by map area
+  const targetRooms = Math.min(15, Math.max(4, Math.floor((COLS * ROWS) / 250))); // Minimum 4 rooms, max 15
 
   // 2. Generate random rooms
-  for (let i = 0; i < maxRooms; i++) {
+  let attempts = 0;
+  while (rooms.length < targetRooms && attempts < 300) {
+    attempts++;
     // Dynamic max size for some larger rooms
     const currentMaxSize = Math.random() < 0.2 ? 12 : 8;
     const w = Math.floor(Math.random() * (currentMaxSize - minSize + 1)) + minSize;
@@ -55,7 +57,7 @@ const generateDungeon = (floor) => {
     // Check overlap with padding of 1
     let overlap = false;
     for (const r of rooms) {
-      if (x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y) {
+      if (x - 1 <= r.x + r.w && x + w + 1 >= r.x && y - 1 <= r.y + r.h && y + h + 1 >= r.y) {
         overlap = true;
         break;
       }
@@ -138,10 +140,17 @@ const generateDungeon = (floor) => {
 
   // Spawn Items
   const items = [];
-  const itemTypes = [
+  const commonItemTypes = [
     { subType: 'potion', char: 'P', name: 'ポーション' },
     { subType: 'chest', char: 'C', name: '宝箱' },
-    { subType: 'shop', char: '$', name: '商人' }
+    { subType: 'shop', char: '$', name: '商人' },
+    { subType: 'golden_apple', char: 'A', name: 'おうごんのリンゴ' },
+    { subType: 'magic_book', char: 'M', name: 'まほうの書' }
+  ];
+
+  const rareItemTypes = [
+    { subType: 'energy_crystal', char: 'E', name: 'エネルギークリスタル' },
+    { subType: 'magic_bag', char: 'B', name: 'まほうのふくろ' }
   ];
 
   const equipmentTypes = [
@@ -186,12 +195,15 @@ const generateDungeon = (floor) => {
     const itemY = Math.floor(room.y + Math.random() * room.h);
     
     if (!(itemX === lastRoom.cx && itemY === lastRoom.cy) && !(itemX === startPos.x && itemY === startPos.y)) {
-      // 70% consumable / chest, 30% equipment
       let selectedItem;
-      if (Math.random() < 0.3) {
+      if (Math.random() < 0.05) {
         selectedItem = equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)];
       } else {
-        selectedItem = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        if (floor >= 3 && Math.random() < 0.08) {
+          selectedItem = rareItemTypes[Math.floor(Math.random() * rareItemTypes.length)];
+        } else {
+          selectedItem = commonItemTypes[Math.floor(Math.random() * commonItemTypes.length)];
+        }
       }
 
       // Check overlaps
@@ -227,6 +239,8 @@ const INITIAL_PLAYER = {
   floor: 1,
   swordEquipped: false,
   shieldEquipped: false,
+  maxEnergy: 3,
+  maxDraw: 3,
   deck: [],
   relics: []
 };
@@ -239,15 +253,15 @@ const rollEnemyIntent = (enemy, turnNumber) => {
   
   if (subType === 'slime') {
     if (seed < 0.5) {
-      return { type: 'attack', damage: atk, name: 'たいあたり', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: atk, weak: 1, name: 'ねばねばタックル', text: `こうげき (${atk}ダメージ + じゃくたいか)` };
     } else {
       return { type: 'defend', block: 4, name: 'からをふくらます', text: `ぼうぎょ (4ブロック)` };
     }
   } else if (subType === 'bat') {
     if (seed < 0.5) {
-      return { type: 'attack', damage: Math.max(2, atk - 1), name: 'ひっかき', text: `こうげき (${Math.max(2, atk - 1)}ダメージ)` };
+      return { type: 'attack', damage: Math.max(2, atk - 1), vulnerable: 1, name: 'きゅうこうか', text: `こうげき (${Math.max(2, atk - 1)}ダメージ + ゼイジャク)` };
     } else {
-      return { type: 'attack', damage: atk, name: 'かみつき', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: atk, lifesteal: true, name: 'かみつき', text: `きゅうけつ (${atk}ダメージ)` };
     }
   } else if (subType === 'skeleton') {
     if (turnNumber % 3 === 0) {
@@ -263,35 +277,35 @@ const rollEnemyIntent = (enemy, turnNumber) => {
     } else if (seed < 0.5) {
       return { type: 'defend', block: 8, name: 'おんりょうのたて', text: `ぼうぎょ (8ブロック)` };
     } else {
-      return { type: 'attack', damage: atk, name: 'ポルターガイスト', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: Math.max(1, atk - 2), vulnerable: 1, name: 'ポルターガイスト', text: `こうげき (${Math.max(1, atk-2)}ダメージ + ゼイジャク)` };
     }
   } else if (subType === 'werewolf') {
     if (turnNumber % 2 === 0) {
       return { type: 'attack', damage: Math.floor(atk/2)+1, multi: 3, name: 'れんぞくひっかき', text: `れんぞくこうげき (${Math.floor(atk/2)+1}x3ダメージ)` };
     } else if (seed < 0.3) {
-      return { type: 'defend', block: 5, name: 'みをかがめる', text: `ぼうぎょ (5ブロック)` };
+      return { type: 'defend', block: 5, strength: 1, name: 'とおぼえ', text: `ぼうぎょ＆チャージ (5ブロック + すじりょく1)` };
     } else {
       return { type: 'attack', damage: atk, name: 'かみつき', text: `こうげき (${atk}ダメージ)` };
     }
   } else if (subType === 'vampire') {
     if (seed < 0.4) {
-      return { type: 'attack', damage: atk + 5, name: 'きゅうけつ', text: `きゅうけつこうげき (${atk + 5}ダメージ)` };
+      return { type: 'attack', damage: atk + 5, lifesteal: true, name: 'きゅうけつ', text: `きゅうけつこうげき (${atk + 5}ダメージ)` };
     } else if (seed < 0.7) {
       return { type: 'buff', strength: 2, name: 'ちをすする', text: `チャージ (すじりょく+2)` };
     } else {
-      return { type: 'attack', damage: Math.floor(atk/2), multi: 2, name: 'やみのはどう', text: `れんぞくこうげき (${Math.floor(atk/2)}x2ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2), multi: 2, vulnerable: 1, name: 'やみのはどう', text: `れんぞくこうげき (${Math.floor(atk/2)}x2ダメージ + ゼイジャク)` };
     }
   } else if (subType === 'demon') {
     if (turnNumber % 3 === 0) {
       return { type: 'attack', damage: atk + 10, name: 'じごくのほのお', text: `ぜんたいこうげき (${atk + 10}ダメージ)` };
     } else if (turnNumber % 3 === 1) {
-      return { type: 'debuff', weak: 2, name: 'あくむ', text: `デバフ (じゃくたいか 2ターン)` };
+      return { type: 'attack', damage: Math.max(1, atk - 5), weak: 2, name: 'あくむのいちげき', text: `こうげき (${Math.max(1, atk-5)}ダメージ + じゃくたいか 2ターン)` };
     } else {
       return { type: 'defend', block: 15, name: 'まほうのバリア', text: `ぼうぎょ (15ブロック)` };
     }
   } else if (subType === 'dragon') {
     if (turnNumber % 4 === 0) {
-      return { type: 'attack', damage: atk + 20, name: 'ドラゴンブレス', text: `ひっさつこうげき (${atk + 20}ダメージ)` };
+      return { type: 'attack', damage: atk + 20, vulnerable: 2, name: 'ドラゴンブレス', text: `ひっさつこうげき (${atk + 20}ダメージ + ゼイジャク 2ターン)` };
     } else if (turnNumber % 4 === 3) {
       return { type: 'buff', strength: 5, name: 'いきをすいこむ', text: `チャージ (すじりょく+5)` };
     } else if (seed < 0.4) {
@@ -332,6 +346,7 @@ function App() {
   const roomDescriptionsRef = useRef([]);
   const visitedRoomsRef = useRef(new Set());
   const mapMessageTimerRef = useRef(null);
+  const lastMoveTimeRef = useRef(0);
   const [mapMessage, setMapMessage] = useState(null);
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
@@ -361,6 +376,8 @@ function App() {
   }, []);
 
   const logEndRef = useRef(null);
+  const chattersPoolRef = useRef([]);
+  const chatterIndexRef = useRef(0);
   const [showDpad, setShowDpad] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -608,13 +625,36 @@ function App() {
     
     const intent = battle.enemyIntent;
     let actionText = "敵のターン...";
+    
     if (intent) {
-      if (intent.damage && intent.block) {
-        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ ＆ ${intent.block} ブロック！`;
-      } else if (intent.damage) {
-        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ！`;
+      if (intent.damage !== undefined) {
+        let multi = intent.multi || 1;
+        let baseDmg = intent.damage + (battle.enemyStatus.strength || 0);
+        if (battle.playerStatus.vulnerable > 0) baseDmg = Math.floor(baseDmg * 1.5);
+        
+        let totalDmg = baseDmg * multi;
+        let playerBlock = battle.playerBlock;
+        let finalDmg = Math.max(0, totalDmg - playerBlock);
+
+        let attackStr = intent.multi ? `${baseDmg}x${multi} ダメージ` : `${baseDmg} ダメージ`;
+
+        if (finalDmg === 0) {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} 🛡️完全にブロックした！`;
+        } else if (playerBlock > 0) {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} (ブロック -${playerBlock} ＝ ${finalDmg}被ダメージ)`;
+        } else {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr}を受けた！`;
+        }
+
+        if (intent.block) {
+          actionText += `\n＆ ${intent.block} ブロック！`;
+        }
       } else if (intent.block) {
         actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.block} ブロック！`;
+      } else if (intent.type === 'debuff') {
+        actionText = `${battle.enemy.name} の「${intent.name}」！\n弱体化を受けた！`;
+      } else if (intent.type === 'buff') {
+         actionText = `${battle.enemy.name} の「${intent.name}」！\n敵が強化された！`;
       } else {
         actionText = `${battle.enemy.name} は様子を見ている...`;
       }
@@ -631,6 +671,52 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [isEnemyTurn, battle]);
+
+  const handleEnemyDefeat = (defeatedEnemy, currentPlayer) => {
+    addLog(`${defeatedEnemy.name} を倒した！`, 'level-up');
+    playVictorySound();
+    
+    const xpReward = defeatedEnemy.xp;
+    const goldReward = defeatedEnemy.gold;
+    currentPlayer.xp += xpReward;
+    currentPlayer.gold += goldReward;
+
+    if (currentPlayer.xp >= currentPlayer.xpNeeded) {
+      currentPlayer.level += 1;
+      currentPlayer.xp -= currentPlayer.xpNeeded;
+      currentPlayer.xpNeeded = Math.round(currentPlayer.xpNeeded * 1.5);
+      currentPlayer.maxHp += 8;
+      currentPlayer.hp = currentPlayer.maxHp;
+      currentPlayer.atk += 2;
+      currentPlayer.def += 1;
+      addLog(`レベルアップ！ レベル ${currentPlayer.level} になった！ (HP最大値+8、HP全回復)`, 'level-up');
+      playLevelUpSound();
+    }
+
+    const enemyX = defeatedEnemy.x;
+    const enemyY = defeatedEnemy.y;
+    const nextEnemies = enemies.filter(e => !(e.x === enemyX && e.y === enemyY));
+    setEnemies(nextEnemies);
+
+    setBattle(null);
+    setPlayer(currentPlayer);
+    
+    let actualGold = goldReward;
+    if (currentPlayer.relics && currentPlayer.relics.some(r => r.key === 'lucky_coin')) {
+      actualGold = Math.floor(actualGold * 1.2);
+    }
+    
+    if (currentPlayer.relics && currentPlayer.relics.some(r => r.key === 'vampire_tooth')) {
+      currentPlayer.hp = Math.min(currentPlayer.maxHp, currentPlayer.hp + 3);
+      addLog("レリック「きゅうけつきのキバ」の効果でHPが3回復した！", 'system');
+    }
+
+    setCardReward({
+      choices: getRandomRewardCards(currentPlayer.floor),
+      gold: actualGold,
+      xp: xpReward
+    });
+  };
 
   const resolveEnemyTurn = () => {
     if (gameOver || gameVictory || activeQuiz || !battle) return;
@@ -678,6 +764,14 @@ function App() {
               playGameOverSound();
               return;
             }
+            
+            if (intent.lifesteal) {
+               let healAmount = Math.floor(finalDmg / 2);
+               if (healAmount > 0) {
+                 nextBattle.enemy.hp = Math.min(nextBattle.enemy.maxHp, nextBattle.enemy.hp + healAmount);
+                 addLog(`${nextBattle.enemy.name} はHPを ${healAmount} 吸収した！`, 'system');
+               }
+            }
           } else {
             addLog("プレイヤーは攻撃を完全にブロックした！", 'system');
           }
@@ -689,14 +783,17 @@ function App() {
         addLog(`${nextBattle.enemy.name} は ${intent.block} のブロックを得た。`, 'system');
       }
 
-      if (intent.type === 'buff') {
-        if (intent.strength) nextBattle.enemyStatus.strength += intent.strength;
+      if (intent.strength) {
+        nextBattle.enemyStatus.strength += intent.strength;
         addLog(`${nextBattle.enemy.name} のパワーが上がった！`, 'system');
       }
-      if (intent.type === 'debuff') {
-        if (intent.weak) nextBattle.playerStatus.weak += intent.weak;
-        if (intent.vulnerable) nextBattle.playerStatus.vulnerable += intent.vulnerable;
-        addLog(`プレイヤーは弱体化された！`, 'system');
+      if (intent.weak) {
+        nextBattle.playerStatus.weak += intent.weak;
+        addLog(`プレイヤーは「じゃくたいか」を受けた！`, 'system');
+      }
+      if (intent.vulnerable) {
+        nextBattle.playerStatus.vulnerable += intent.vulnerable;
+        addLog(`プレイヤーは「ゼイジャク」になった！`, 'system');
       }
     }
     
@@ -707,9 +804,9 @@ function App() {
        addLog(`毒により ${nextBattle.enemy.name} に ${pDmg} ダメージ！`, 'system');
        nextBattle.enemyStatus.poison -= 1;
        if (nextBattle.enemy.hp <= 0) {
-         // handle death from poison... wait, this is getting complicated.
-         // Just a log for now, player has to attack to trigger win in handleCombatAction to be safe, 
-         // OR we just set enemy hp and the next attack kills. Let's just deal the damage.
+         handleEnemyDefeat(nextBattle.enemy, nextPlayer);
+         setIsEnemyTurn(false);
+         return;
        }
     }
 
@@ -728,7 +825,7 @@ function App() {
     let discardPile = [...nextBattle.discardPile];
     let hand = [];
     
-    let drawCount = 3;
+    let drawCount = nextPlayer.maxDraw || 3;
     if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'king_crown')) drawCount += 1;
 
     for (let i = 0; i < drawCount; i++) {
@@ -884,7 +981,7 @@ function App() {
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#fca5a5' : '#93c5fd' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#dc2626' : '#0284c7' }}>
                         {card.name}
                       </span>
                     </div>
@@ -1030,22 +1127,23 @@ function App() {
                       onClick={() => handleSmithSelectCard(card)}
                       style={{
                         padding: '4px',
-                        background: '#e5e7eb',
-                        border: `1px solid ${card.upgraded ? '#4b5563' : '#f59e0b'}`,
+                        background: '#ffffff',
+                        border: `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
-                        color: card.upgraded ? '#4b5563' : '#fff',
+                        color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
                         cursor: canUpgrade ? 'pointer' : 'default',
                         opacity: canUpgrade ? 1 : 0.6,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '1px'
+                        gap: '1px',
+                        boxShadow: canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
                       }}
                     >
-                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#4b5563' : '#fef08a' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
                         {card.name}
                       </div>
-                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2' }}>
+                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2', color: card.upgraded ? '#9ca3af' : '#4b5563' }}>
                         {card.desc}
                       </div>
                     </button>
@@ -1055,6 +1153,163 @@ function App() {
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderShopContent = () => {
+    if (!shop) return null;
+    const { cards, items, weapons, removeCost, removeMode } = shop;
+
+    const getCardPrice = (card) => {
+      if (card.rarity === 'common') return 50;
+      if (card.rarity === 'uncommon') return 75;
+      if (card.rarity === 'rare') return 100;
+      return 50;
+    };
+
+    const handleBuyCard = (card) => {
+      const price = getCardPrice(card);
+      if (player.gold >= price) {
+        setPlayer(prev => ({ ...prev, gold: prev.gold - price, deck: [...prev.deck, card] }));
+        setShop(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== card.id) }));
+        addLog(`🪙 ${price}Gを支払い、「${card.name}」を購入した。`, 'system');
+      } else {
+        addLog(`ゴールドが足りない！`, 'system');
+      }
+    };
+
+    const handleBuyItem = (itemData) => {
+      if (player.gold >= itemData.cost) {
+        setPlayer(prev => {
+          let np = { ...prev, gold: prev.gold - itemData.cost };
+          if (itemData.key === 'potion') { np.hp = Math.min(np.maxHp, np.hp + 25); }
+          else if (itemData.key === 'golden_apple') { np.maxHp += 10; np.hp += 10; }
+          else if (itemData.key === 'energy_crystal') { np.maxEnergy = (np.maxEnergy || 3) + 1; }
+          else if (itemData.key === 'magic_bag') { np.maxDraw = (np.maxDraw || 3) + 1; }
+          return np;
+        });
+        setShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
+        addLog(`🪙 ${itemData.cost}G支払い、「${itemData.name}」を購入した。`, 'system');
+      } else { addLog(`ゴールドが足りない！`, 'system'); }
+    };
+
+    const handleBuyWeapon = (weapon) => {
+      if (player.gold >= weapon.cost) {
+        setPlayer(prev => {
+          const np = { ...prev, gold: prev.gold - weapon.cost };
+          if (weapon.key === 'sword') {
+            np.swordLevel = (np.swordLevel || (np.swordEquipped ? 2 : 0)) + 1;
+            np.swordEquipped = true;
+          } else {
+            np.shieldLevel = (np.shieldLevel || (np.shieldEquipped ? 2 : 0)) + 1;
+            np.shieldEquipped = true;
+          }
+          return np;
+        });
+        setShop(prev => ({ ...prev, weapons: prev.weapons.filter(w => w.key !== weapon.key) }));
+        addLog(`🪙 ${weapon.cost}G支払い、「${weapon.name}」を購入した。`, 'system');
+      } else { addLog(`ゴールドが足りない！`, 'system'); }
+    };
+
+    const handleHeal = () => {
+      if (player.hp >= player.maxHp) {
+        addLog(`HPはすでに満タンだ。`, 'system');
+      } else if (player.gold >= 30) {
+        setPlayer(prev => ({ ...prev, gold: prev.gold - 30, hp: Math.min(prev.maxHp, prev.hp + 30) }));
+        addLog(`🪙 30G支払い、HPを30回復した。`, 'system');
+      } else { addLog(`ゴールドが足りない！`, 'system'); }
+    };
+
+    const handleRemoveCardSelect = (cardIndex) => {
+      if (player.gold >= removeCost) {
+        setPlayer(prev => {
+          const newDeck = [...prev.deck];
+          const removed = newDeck.splice(cardIndex, 1)[0];
+          addLog(`🪙 ${removeCost}G支払い、「${removed.name}」を削除した。`, 'system');
+          return { ...prev, gold: prev.gold - removeCost, deck: newDeck, removedCount: (prev.removedCount || 0) + 1 };
+        });
+        setShop(prev => ({ ...prev, removeCost: prev.removeCost + 25, removeMode: false }));
+      } else {
+        addLog(`ゴールドが足りない！`, 'system');
+        setShop(prev => ({ ...prev, removeMode: false }));
+      }
+    };
+
+    const handleLeaveShop = () => {
+      addLog("ショップをあとにした。", 'system');
+      setShop(null);
+    };
+
+    if (removeMode) {
+      return (
+        <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontWeight: 'bold', color: '#dc2626' }}>削除するカードを選んでください ({removeCost}G)</span>
+            <button onClick={() => setShop(prev => ({ ...prev, removeMode: false }))} style={{ padding: '2px 6px', fontSize: '0.7rem' }}>キャンセル</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              {player.deck.map((card, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleRemoveCardSelect(idx)}
+                  style={{ padding: '4px', background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '4px', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: '#b91c1c' }}>{card.name}</div>
+                  <div style={{ fontSize: '0.6rem' }}>{card.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827', gap: '8px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ color: '#d97706', margin: 0, fontSize: '1rem' }}>商人</h2>
+          <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>所持金: {player.gold} G</div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '4px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {cards.map((card, idx) => {
+            const price = getCardPrice(card);
+            const canAfford = player.gold >= price;
+            return (
+              <button key={idx} onClick={() => handleBuyCard(card)} style={{ flex: '0 1 100px', border: `1px solid #eab308`, borderRadius: '4px', background: canAfford ? '#ffffff' : '#f3f4f6', padding: '5px', cursor: canAfford ? 'pointer' : 'not-allowed', textAlign: 'left', opacity: canAfford ? 1 : 0.6 }}>
+                <div style={{ fontWeight: 'bold', fontSize: '0.62rem' }}>{card.name}</div>
+                <div style={{ fontSize: '0.6rem', color: '#f59e0b', textAlign: 'center', marginTop: '4px' }}>{price} G</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ borderTop: '1px dashed #d1d5db', margin: '4px 0' }}></div>
+        <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#4b5563', marginBottom: '2px' }}>その他のサービス</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          {items && items.map((item, idx) => (
+            <button key={`i${idx}`} onClick={() => handleBuyItem(item)} disabled={player.gold < item.cost} style={{ padding: '6px', background: '#fff', border: '1px solid #3b82f6', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= item.cost ? 1 : 0.6 }}>
+              {item.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.cost} G</span>
+            </button>
+          ))}
+          {weapons && weapons.map((w, idx) => (
+            <button key={`w${idx}`} onClick={() => handleBuyWeapon(w)} disabled={player.gold < w.cost} style={{ padding: '6px', background: '#fff', border: '1px solid #8b5cf6', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= w.cost ? 1 : 0.6 }}>
+              {w.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{w.cost} G</span>
+            </button>
+          ))}
+          <button onClick={handleHeal} disabled={player.gold < 30} style={{ padding: '6px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= 30 ? 1 : 0.6 }}>
+            HP30 回復 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>30 G</span>
+          </button>
+          <button onClick={() => setShop(prev => ({ ...prev, removeMode: true }))} disabled={player.gold < removeCost || player.deck.length <= 1} style={{ padding: '6px', background: '#fff', border: '1px solid #ef4444', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= removeCost ? 1 : 0.6 }}>
+            カード削除 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{removeCost} G</span>
+          </button>
+        </div>
+
+        <button onClick={handleLeaveShop} style={{ marginTop: 'auto', padding: '8px 10px', background: '#d1d5db', color: '#111827', border: 'none', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'center' }}>
+          店を出る
+        </button>
       </div>
     );
   };
@@ -1119,7 +1374,7 @@ function App() {
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.62rem', color: card.type === 'attack' ? '#fca5a5' : card.type === 'skill' ? '#93c5fd' : '#fef08a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70px' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.62rem', color: card.type === 'attack' ? '#dc2626' : card.type === 'skill' ? '#0284c7' : '#d97706', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70px' }}>
                       {card.name}
                     </span>
                     <span style={{
@@ -1137,7 +1392,7 @@ function App() {
                       {card.cost}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.55rem', color: '#d1d5db', lineHeight: '1.2', maxHeight: '65px', overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.55rem', color: '#4b5563', lineHeight: '1.2', maxHeight: '65px', overflow: 'hidden' }}>
                     {card.desc}
                   </div>
                 </div>
@@ -1170,12 +1425,32 @@ function App() {
 
   const renderExplorationMapContent = () => (
     <div className="map-panel-body" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start', minHeight: '32px' }}>
+        <div style={{ flex: 1 }}>
+          {mapMessage && (
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #0284c7',
+              color: '#111827',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              textAlign: 'left',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+              fontSize: '0.8rem',
+              lineHeight: '1.4',
+              fontStyle: 'italic',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              「{mapMessage}」
+            </div>
+          )}
+        </div>
         <button 
           type="button" 
           className="layout-ctrl-btn" 
           onClick={() => setShowDpad(prev => !prev)} 
-          style={{ color: showDpad ? '#00ff66' : '#888' }}
+          style={{ color: showDpad ? '#059669' : '#888', marginLeft: '8px', whiteSpace: 'nowrap', marginTop: '2px' }}
           title="コントローラーの表示/非表示"
         >
           {showDpad ? '🎮 パッド非表示' : '🎮 パッド表示'}
@@ -1183,26 +1458,6 @@ function App() {
       </div>
       <div className="map-container-wrapper" style={{ position: 'relative' }}>
         <TileMap grid={renderGrid} />
-        {mapMessage && (
-          <div style={{
-            position: 'absolute',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            border: '1px solid #ff3e3e',
-            color: '#111827',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            zIndex: 100,
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(255,62,62,0.2)',
-            pointerEvents: 'none',
-            minWidth: '200px'
-          }}>
-            <span style={{ fontStyle: 'italic', fontSize: '0.85rem', lineHeight: '1.4' }}>{mapMessage}</span>
-          </div>
-        )}
       </div>
       <div className="controls-wrapper" style={{ width: '100%' }}>
         {showDpad ? (
@@ -1242,6 +1497,9 @@ function App() {
     }
     if (campsite) {
       return renderCampsiteContent();
+    }
+    if (shop) {
+      return renderShopContent();
     }
     if (cardReward) {
       return renderCardRewardContent();
@@ -1305,13 +1563,13 @@ function App() {
         EQUIPPED RELICS
       </div>
       <div className="inventory-list">
-        <div className={`inventory-slot ${player.swordEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.swordEquipped ? '🗡️' : '➖'}</span>
-          <span>{player.swordEquipped ? '鉄の剣 (開始時 筋力+2)' : '遺物スロット'}</span>
+        <div className={`inventory-slot ${player.swordLevel || player.swordEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.swordLevel || player.swordEquipped ? '🗡️' : '➖'}</span>
+          <span>{player.swordLevel || player.swordEquipped ? `剣 Lv.${player.swordLevel || (player.swordEquipped ? 2 : 0)} (開始時 筋力+${player.swordLevel || 2})` : '遺物スロット'}</span>
         </div>
-        <div className={`inventory-slot ${player.shieldEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.shieldEquipped ? '🛡️' : '➖'}</span>
-          <span>{player.shieldEquipped ? '鉄の盾 (開始時 3ブ & 金+2)' : '遺物スロット'}</span>
+        <div className={`inventory-slot ${player.shieldLevel || player.shieldEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.shieldLevel || player.shieldEquipped ? '🛡️' : '➖'}</span>
+          <span>{player.shieldLevel || player.shieldEquipped ? `盾 Lv.${player.shieldLevel || (player.shieldEquipped ? 2 : 0)} (開始時 ブロック+${(player.shieldLevel || 2) * 2})` : '遺物スロット'}</span>
         </div>
       </div>
     </div>
@@ -1588,8 +1846,12 @@ function App() {
     setFloorStory(null);
     generateFloorStory(1).then(data => {
       setFloorStory(data.story);
-      roomDescriptionsRef.current = data.rooms || [];
-      visitedRoomsRef.current = new Set();
+      chattersPoolRef.current = data.chatters && data.chatters.length > 0 ? data.chatters : [
+        "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+        "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+        "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+      ];
+      chatterIndexRef.current = 0;
       setIsStoryLoading(false);
     });
 
@@ -1612,14 +1874,7 @@ function App() {
     setBattle(null);
     setCampsite(null);
     setCardReward(null);
-    
-    const welcomeMsgs = [
-      "カードデッキ構築型 RPG へようこそ！",
-      "探索操作: キーボードの矢印キー、WASD、または画面下のボタンで移動",
-      "戦闘システム: 敵を踏むとStSカードバトル突入。単語を綴ってカードを発動せよ！",
-      "Floor 5 の階段を降りればクリアです！ 生還を目指しましょう。"
-    ];
-    welcomeMsgs.forEach(msg => addLog(msg, 'system'));
+
   };
 
   // Set up next floor
@@ -1628,8 +1883,12 @@ function App() {
     setFloorStory(null);
     generateFloorStory(nextFloorNum).then(data => {
       setFloorStory(data.story);
-      roomDescriptionsRef.current = data.rooms || [];
-      visitedRoomsRef.current = new Set();
+      chattersPoolRef.current = data.chatters && data.chatters.length > 0 ? data.chatters : [
+        "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+        "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+        "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+      ];
+      chatterIndexRef.current = 0;
       setIsStoryLoading(false);
     });
 
@@ -1689,8 +1948,19 @@ function App() {
         playHitSound();
 
         const stateHelpers = {
-          dealDamage: (dmg) => {
-            let finalDmg = dmg + (nextPlayer.swordEquipped ? 2 : 0);
+          dealDamage: (dmg, target, options) => {
+            let baseDmg = dmg === 'block' ? nextBattle.playerBlock : dmg;
+            
+            // 筋力の適用
+            const strMulti = options?.strengthMultiplier || 1;
+            baseDmg += (nextBattle.playerStatus.strength || 0) * strMulti;
+
+            // 弱体化（Weak）の適用: ダメージ25%減少
+            if (nextBattle.playerStatus.weak > 0) {
+              baseDmg = Math.floor(baseDmg * 0.75);
+            }
+
+            let finalDmg = baseDmg;
             let enemyBlock = nextBattle.enemyBlock;
             let damageToHp = finalDmg;
             
@@ -1715,7 +1985,7 @@ function App() {
             stateHelpers.dealDamage(dmg);
           },
           gainBlock: (blk) => {
-            let finalBlk = blk + (nextPlayer.shieldEquipped ? 3 : 0);
+            let finalBlk = blk;
             nextBattle.playerBlock += finalBlk;
             addLog(`ブロックを ${finalBlk} えた。`, 'system');
           },
@@ -1723,12 +1993,35 @@ function App() {
             nextPlayer.hp = Math.min(nextPlayer.maxHp, nextPlayer.hp + amount);
             addLog(`HPが ${amount} かいふくした！`, 'level-up');
           },
-          applyStatus: () => {},
+          applyStatus: (target, type, amount) => {
+            if (type === 'poison') {
+              nextBattle.enemyStatus.poison = (nextBattle.enemyStatus.poison || 0) + amount;
+              addLog(`てきに ${amount} の「どく」をあたえた！`, 'system');
+            }
+          },
           applyStatusToAll: () => {},
           gainStrength: () => {},
           addTurnEndEffect: () => {},
           addPower: () => {},
-          drawCards: () => {},
+          drawCards: (count) => {
+            let drawn = 0;
+            for (let i = 0; i < count; i++) {
+              if (nextBattle.drawPile.length === 0) {
+                if (nextBattle.discardPile.length === 0) break;
+                nextBattle.drawPile = [...nextBattle.discardPile].sort(() => Math.random() - 0.5);
+                nextBattle.discardPile = [];
+                addLog('すてふだをシャッフルして、やまふだにもどした。', 'system');
+              }
+              const c = nextBattle.drawPile.pop();
+              if (c) {
+                nextBattle.hand.push(c);
+                drawn++;
+              }
+            }
+            if (drawn > 0) {
+              addLog(`カードを ${drawn} 枚ひいた！`, 'system');
+            }
+          },
           addCardToDiscard: () => {},
           triggerExhaust: () => {}
         };
@@ -1758,49 +2051,7 @@ function App() {
 
       // Check if enemy died
       if (nextBattle.enemy.hp <= 0) {
-        addLog(`${nextBattle.enemy.name} を倒した！`, 'level-up');
-        playVictorySound();
-        
-        const xpReward = nextBattle.enemy.xp;
-        const goldReward = nextBattle.enemy.gold;
-        nextPlayer.xp += xpReward;
-        nextPlayer.gold += goldReward;
-
-        if (nextPlayer.xp >= nextPlayer.xpNeeded) {
-          nextPlayer.level += 1;
-          nextPlayer.xp -= nextPlayer.xpNeeded;
-          nextPlayer.xpNeeded = Math.round(nextPlayer.xpNeeded * 1.5);
-          nextPlayer.maxHp += 8;
-          nextPlayer.hp = nextPlayer.maxHp;
-          nextPlayer.atk += 2;
-          nextPlayer.def += 1;
-          addLog(`レベルアップ！ レベル ${nextPlayer.level} になった！ (HP最大値+8、HP全回復)`, 'level-up');
-          playLevelUpSound();
-        }
-
-        const enemyX = nextBattle.enemy.x;
-        const enemyY = nextBattle.enemy.y;
-        const nextEnemies = enemies.filter(e => !(e.x === enemyX && e.y === enemyY));
-        setEnemies(nextEnemies);
-
-        setBattle(null);
-        setPlayer(nextPlayer);
-        
-        let actualGold = goldReward;
-        if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'lucky_coin')) {
-          actualGold = Math.floor(actualGold * 1.2);
-        }
-        
-        if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'vampire_tooth')) {
-          nextPlayer.hp = Math.min(nextPlayer.maxHp, nextPlayer.hp + 3);
-          addLog("レリック「きゅうけつきのキバ」の効果でHPが3回復した！", 'system');
-        }
-
-        setCardReward({
-          choices: getRandomRewardCards(nextPlayer.floor),
-          gold: actualGold,
-          xp: xpReward
-        });
+        handleEnemyDefeat(nextBattle.enemy, nextPlayer);
         setActiveQuiz(null);
         return;
       }
@@ -1851,8 +2102,8 @@ function App() {
       }
 
       let startingBlock = 0;
-      if (player.shieldEquipped) {
-        startingBlock += 3;
+      if (player.shieldLevel || player.shieldEquipped) {
+        startingBlock += (player.shieldLevel || 2) * 2;
       }
       if (player.relics && player.relics.some(r => r.key === 'iron_shield')) {
         startingBlock += 5;
@@ -1868,11 +2119,11 @@ function App() {
         hand: hand,
         discardPile: [],
         exhaustPile: [],
-        playerEnergy: 3,
-        playerMaxEnergy: 3,
+        playerEnergy: player.maxEnergy || 3,
+        playerMaxEnergy: player.maxEnergy || 3,
         playerBlock: startingBlock,
         playerStatus: {
-          strength: (player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0,
+          strength: ((player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0) + (player.swordLevel || (player.swordEquipped ? 2 : 0)),
           vulnerable: 0,
           weak: 0,
           barricade: 0,
@@ -1903,18 +2154,65 @@ function App() {
           nextPlayer.gold += goldAmount;
           addLog(`${item.name} を開けた！ ${goldAmount} ゴールドを獲得。`, 'item-pickup');
         } else if (item.subType === 'shop') {
+          const shopItems = [];
+          const itemPool = ['potion', 'golden_apple', 'energy_crystal', 'magic_bag'];
+          const costs = { 'potion': 30, 'golden_apple': 75, 'energy_crystal': 150, 'magic_bag': 150 };
+          const names = { 'potion': 'ポーション', 'golden_apple': 'おうごんのリンゴ', 'energy_crystal': 'エネルギークリスタル', 'magic_bag': 'まほうのふくろ' };
+          
+          let selectedItemKey = itemPool[Math.floor(Math.random() * 2)];
+          if (nextPlayer.floor >= 3 && Math.random() < 0.3) {
+            selectedItemKey = itemPool[2 + Math.floor(Math.random() * 2)];
+          }
+          shopItems.push({ key: selectedItemKey, name: names[selectedItemKey], cost: costs[selectedItemKey] });
+          
+          const shopWeapons = [];
+          const curSwordLv = nextPlayer.swordLevel || (nextPlayer.swordEquipped ? 2 : 0);
+          const curShieldLv = nextPlayer.shieldLevel || (nextPlayer.shieldEquipped ? 2 : 0);
+          if (curSwordLv < 5) shopWeapons.push({ key: 'sword', name: `剣を強化(Lv.${curSwordLv+1})`, cost: 100 + curSwordLv * 50 });
+          if (curShieldLv < 5) shopWeapons.push({ key: 'shield', name: `盾を強化(Lv.${curShieldLv+1})`, cost: 100 + curShieldLv * 50 });
+
           setShop({
-            cards: getRandomRewardCards(floor),
-            relic: getRandomRelic(nextPlayer.relics ? nextPlayer.relics.map(r => r.key) : []),
-            removeCost: 50 + (nextPlayer.removedCount || 0) * 25
+            cards: getRandomRewardCards(nextPlayer.floor),
+            items: shopItems,
+            weapons: shopWeapons,
+            removeCost: 50 + (nextPlayer.removedCount || 0) * 25,
+            removeMode: false
           });
           addLog('商人に出会った。', 'system');
         } else if (item.subType === 'sword') {
+          const curLv = nextPlayer.swordLevel || (nextPlayer.swordEquipped ? 2 : 0);
+          nextPlayer.swordLevel = curLv + 1;
           nextPlayer.swordEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(こうげきダメージが 2 ふえる！)`, 'item-pickup');
+          addLog(`遺物「${item.name}」を手に入れた！(剣Lv.${curLv+1} : 筋力+${curLv+1})`, 'item-pickup');
         } else if (item.subType === 'shield') {
+          const curLv = nextPlayer.shieldLevel || (nextPlayer.shieldEquipped ? 2 : 0);
+          nextPlayer.shieldLevel = curLv + 1;
           nextPlayer.shieldEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(ぼうぎょのブロックが 3 ふえる！)`, 'item-pickup');
+          addLog(`遺物「${item.name}」を手に入れた！(盾Lv.${curLv+1} : ブロック+${(curLv+1)*2})`, 'item-pickup');
+        } else if (item.subType === 'energy_crystal') {
+          nextPlayer.maxEnergy = (nextPlayer.maxEnergy || 3) + 1;
+          addLog(`「${item.name}」を拾った！さいだいエネルギーが 1 ふえた！`, 'level-up');
+        } else if (item.subType === 'magic_bag') {
+          nextPlayer.maxDraw = (nextPlayer.maxDraw || 3) + 1;
+          addLog(`「${item.name}」を拾った！まいターン引けるカードが 1 まい増えた！`, 'level-up');
+        } else if (item.subType === 'golden_apple') {
+          nextPlayer.maxHp += 10;
+          nextPlayer.hp += 10;
+          addLog(`「${item.name}」を食べた！さいだいHPが 10 ふえて、10 かいふくした！`, 'level-up');
+        } else if (item.subType === 'magic_book') {
+          const upgradableCards = nextPlayer.deck.filter(c => !c.upgraded);
+          if (upgradableCards.length > 0) {
+            const randomCard = upgradableCards[Math.floor(Math.random() * upgradableCards.length)];
+            const index = nextPlayer.deck.findIndex(c => c.id === randomCard.id);
+            if (index !== -1) {
+              const upgradedCard = createCardInstance(randomCard.key, true);
+              upgradedCard.id = randomCard.id;
+              nextPlayer.deck[index] = upgradedCard;
+              addLog(`「${item.name}」を読んだ！デッキの「${randomCard.name}」が強化された！`, 'level-up');
+            }
+          } else {
+            addLog(`「${item.name}」を見つけたが、これ以上強化できるカードがなかった。`, 'system');
+          }
         }
 
         nextItems.splice(itemIndex, 1);
@@ -1924,21 +2222,27 @@ function App() {
       nextPlayer.y = ty;
       playMoveSound();
 
+      let chatterTriggered = false;
+      if (Math.random() < 0.15) {
+        const sequence = chattersPoolRef.current;
+        if (chatterIndexRef.current < sequence.length) {
+          const nextChatter = sequence[chatterIndexRef.current];
+          setMapMessage(nextChatter);
+          addLog(`「${nextChatter}」`, 'system');
+          if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
+          mapMessageTimerRef.current = setTimeout(() => {
+            setMapMessage(null);
+          }, 4500);
+          chatterIndexRef.current++;
+        }
+      }
+
       // 新しい部屋に入ったかチェックして描写を出す
       const currentRoomIndex = rooms.findIndex(r => 
         tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h
       );
       if (currentRoomIndex !== -1 && !visitedRoomsRef.current.has(currentRoomIndex)) {
         visitedRoomsRef.current.add(currentRoomIndex);
-        if (roomDescriptionsRef.current.length > 0) {
-          const desc = roomDescriptionsRef.current.shift();
-          addLog(`【部屋】 ${desc}`, 'system');
-          setMapMessage(desc);
-          if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
-          mapMessageTimerRef.current = setTimeout(() => {
-            setMapMessage(null);
-          }, 4000);
-        }
       }
 
       if (targetTile.type === 'stairs') {
@@ -2043,37 +2347,56 @@ function App() {
     const handleKeyDown = (e) => {
       if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
 
+      const now = Date.now();
+      if (now - lastMoveTimeRef.current < 120) {
+        // 十字キーなどのデフォルトのスクロール挙動を防ぐ
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', ' '].includes(e.key)) {
+          e.preventDefault();
+        }
+        return;
+      }
+
+      let moved = false;
       switch(e.key) {
         case 'ArrowUp':
         case 'w':
         case 'W':
           e.preventDefault();
           handleMove(0, -1);
+          moved = true;
           break;
         case 'ArrowDown':
         case 's':
         case 'S':
           e.preventDefault();
           handleMove(0, 1);
+          moved = true;
           break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
           e.preventDefault();
           handleMove(-1, 0);
+          moved = true;
           break;
         case 'ArrowRight':
         case 'd':
         case 'D':
           e.preventDefault();
           handleMove(1, 0);
+          moved = true;
           break;
         case ' ':
           e.preventDefault();
           handleWait();
+          moved = true;
           break;
         default:
           break;
+      }
+
+      if (moved) {
+        lastMoveTimeRef.current = now;
       }
     };
 
@@ -2081,7 +2404,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
 
-  const VIEWPORT_RADIUS = 10;
+  const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
   
   if (grid.length > 0) {
@@ -2214,27 +2537,7 @@ function App() {
         )}
       </main>
 
-      { (isStoryLoading || floorStory) && !gameOver && !gameVictory && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-          <div style={{ background: '#ffffff', border: '1px solid #ff3e3e', padding: '30px', borderRadius: '10px', maxWidth: '500px', color: '#111827', textAlign: 'center', boxShadow: '0 0 20px rgba(255, 62, 62, 0.3)' }}>
-            <h2 style={{ color: '#ff3e3e', marginBottom: '20px' }}>第 {player.floor} 階層</h2>
-            <div style={{ minHeight: '100px', marginBottom: '20px', fontSize: '1.1rem', lineHeight: '1.6' }}>
-              {isStoryLoading ? (
-                <span style={{ color: '#4b5563', fontStyle: 'italic' }}>Geminiがストーリーを生成中...<br/>(APIキー未設定の場合はすぐに終わります)</span>
-              ) : (
-                floorStory
-              )}
-            </div>
-            <button
-              onClick={() => setFloorStory(null)}
-              disabled={isStoryLoading}
-              style={{ padding: '10px 30px', fontSize: '1.1rem', background: isStoryLoading ? '#3f3f46' : '#ff3e3e', color: '#111827', border: 'none', borderRadius: '5px', cursor: isStoryLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
-            >
-              探索を開始する
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Game Over Screen */}
       {gameOver && (

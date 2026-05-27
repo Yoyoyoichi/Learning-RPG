@@ -8,8 +8,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #f3f4f6;
-  color: #e1e4e8;
+  background-color: #e5e7eb;
+  color: #333333;
   font-family: 'Consolas', 'Courier New', Courier, monospace;
   height: 100vh;
   overflow: hidden; /* Completely prevent page vertical scroll */
@@ -51,8 +51,8 @@ html, body {
 .app-header h1 {
   font-size: 1.4rem;
   margin: 0;
-  color: #00ff66;
-  text-shadow: 0 0 8px rgba(0, 255, 102, 0.4), 0 0 15px rgba(0, 255, 102, 0.2);
+  color: #059669;
+  text-shadow: 0 0 8px rgba(5, 150, 105, 0.4), 0 0 15px rgba(5, 150, 105, 0.2);
   text-transform: uppercase;
   letter-spacing: 2px;
   line-height: 1.1;
@@ -134,11 +134,11 @@ html, body {
 
 /* Panel Design */
 .panel {
-  background: rgba(18, 18, 22, 0.7);
-  border: 1.5px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid #9ca3af;
   border-radius: 10px;
   padding: 0.5rem 0.75rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(6px);
 }
 
@@ -146,9 +146,8 @@ html, body {
   margin-top: 0;
   margin-bottom: 0.4rem;
   font-size: 0.9rem;
-  color: #00ff66;
-  text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
-  border-bottom: 1px solid #d1d5db;
+  color: #059669;
+  border-bottom: 1px solid #9ca3af;
   padding-bottom: 0.3rem;
   text-transform: uppercase;
   display: flex;
@@ -183,18 +182,15 @@ html, body {
 }
 
 .stat-value.level {
-  color: #ff00ff;
-  text-shadow: 0 0 3px rgba(255, 0, 255, 0.4);
+  color: #c026d3;
 }
 
 .stat-value.gold {
-  color: #ffb300;
-  text-shadow: 0 0 3px rgba(255, 179, 0, 0.4);
+  color: #d97706;
 }
 
 .stat-value.floor {
-  color: #00d2ff;
-  text-shadow: 0 0 3px rgba(0, 210, 255, 0.4);
+  color: #0284c7;
 }
 
 /* Progress bar (HP & XP) */
@@ -225,8 +221,8 @@ html, body {
 }
 
 .bar-fill.hp {
-  background: linear-gradient(90deg, #ff3b30, #00ff66);
-  box-shadow: 0 0 8px rgba(0, 255, 102, 0.4);
+  background: linear-gradient(90deg, #ff3b30, #059669);
+  box-shadow: 0 0 8px rgba(5, 150, 105, 0.4);
 }
 
 .bar-fill.xp {
@@ -260,9 +256,9 @@ html, body {
 }
 
 .inventory-slot.equipped {
-  border: 1px solid #00d2ff;
-  color: #111827;
-  background: rgba(0, 210, 255, 0.05);
+  border: 1px solid #2563eb;
+  color: #1e3a8a;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .equip-icon {
@@ -301,29 +297,29 @@ html, body {
 }
 
 .log-entry.damage-dealt {
-  color: #00ff66;
-  border-left-color: #00ff66;
+  color: #059669;
+  border-left-color: #059669;
 }
 
 .log-entry.damage-taken {
-  color: #ff3b30;
-  border-left-color: #ff3b30;
+  color: #dc2626;
+  border-left-color: #dc2626;
 }
 
 .log-entry.item-pickup {
-  color: #00ffff;
-  border-left-color: #00ffff;
+  color: #0284c7;
+  border-left-color: #0284c7;
 }
 
 .log-entry.level-up {
-  color: #ff00ff;
-  border-left-color: #ff00ff;
+  color: #c026d3;
+  border-left-color: #c026d3;
   font-weight: bold;
 }
 
 .log-entry.system {
-  color: #ffd700;
-  border-left-color: #ffd700;
+  color: #d97706;
+  border-left-color: #d97706;
 }
 
 /* Legend Box */
@@ -380,10 +376,10 @@ html, body {
 }
 
 .dpad-btn:active {
-  background: #00ff66;
+  background: #059669;
   color: #f3f4f6;
-  border-color: #00ff66;
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+  border-color: #059669;
+  box-shadow: 0 0 10px rgba(5, 150, 105, 0.5);
 }
 
 .dpad-btn.empty {
@@ -436,8 +432,8 @@ html, body {
 }
 
 .overlay-title.victory {
-  color: #00ff66;
-  text-shadow: 0 0 15px rgba(0, 255, 102, 0.5);
+  color: #059669;
+  text-shadow: 0 0 15px rgba(5, 150, 105, 0.5);
 }
 
 .overlay-stats {
@@ -455,8 +451,8 @@ html, body {
 
 .action-btn {
   background: #f3f4f6;
-  border: 2px solid #00ff66;
-  color: #00ff66;
+  border: 2px solid #059669;
+  color: #059669;
   font-family: inherit;
   font-size: 1.1rem;
   font-weight: bold;
@@ -464,13 +460,13 @@ html, body {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+  box-shadow: 0 0 10px rgba(5, 150, 105, 0.15);
 }
 
 .action-btn:hover {
-  background: #00ff66;
+  background: #059669;
   color: #f3f4f6;
-  box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+  box-shadow: 0 0 15px rgba(5, 150, 105, 0.4);
 }
 
 .action-btn.reset-panel {
@@ -520,11 +516,11 @@ html, body {
 }
 
 .panel-tab-btn.active {
-  background: rgba(0, 255, 102, 0.08);
-  border-color: #00ff66;
-  color: #00ff66;
-  text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+  background: rgba(5, 150, 105, 0.08);
+  border-color: #059669;
+  color: #059669;
+  text-shadow: 0 0 5px rgba(5, 150, 105, 0.4);
+  box-shadow: 0 0 10px rgba(5, 150, 105, 0.15);
 }
 
 /* Layout customizer controls styles */
@@ -554,9 +550,9 @@ html, body {
 }
 
 .layout-ctrl-btn:hover:not(:disabled) {
-  border-color: #00ff66;
-  color: #00ff66;
-  background: rgba(0, 255, 102, 0.05);
+  border-color: #059669;
+  color: #059669;
+  background: rgba(5, 150, 105, 0.05);
 }
 
 .layout-ctrl-btn:disabled {
@@ -617,19 +613,19 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #060608;
-  border: 1.5px solid #1f1f23;
+  background: #d1d5db;
+  border: 1.5px solid #9ca3af;
   border-radius: 12px;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
 }
 
 .window {
   position: absolute;
-  background: rgba(18, 18, 22, 0.95);
-  border: 1.5px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid #9ca3af;
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
@@ -639,13 +635,13 @@ html, body {
 }
 
 .window:focus-within {
-  border-color: #00ff66;
-  box-shadow: 0 0 15px rgba(0, 255, 102, 0.15), 0 10px 30px rgba(0, 0, 0, 0.6);
+  border-color: #059669;
+  box-shadow: 0 0 10px rgba(5, 150, 105, 0.15), 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .window-header {
-  background: #ffffff;
-  border-bottom: 1.5px solid #d1d5db;
+  background: #f3f4f6;
+  border-bottom: 1.5px solid #9ca3af;
   padding: 6px 10px;
   display: flex;
   justify-content: space-between;
@@ -659,8 +655,7 @@ html, body {
 .window-title {
   font-size: 0.8rem;
   font-weight: bold;
-  color: #00ff66;
-  text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+  color: #059669;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -733,11 +728,11 @@ html, body {
 }
 
 .control-btn.active {
-  border-color: #00ff66;
-  color: #00ff66;
-  background: rgba(0, 255, 102, 0.05);
-  text-shadow: 0 0 4px rgba(0, 255, 102, 0.2);
-  box-shadow: 0 0 10px rgba(0, 255, 102, 0.1);
+  border-color: #059669;
+  color: #059669;
+  background: rgba(5, 150, 105, 0.05);
+  text-shadow: 0 0 4px rgba(5, 150, 105, 0.2);
+  box-shadow: 0 0 10px rgba(5, 150, 105, 0.1);
 }
 
 .control-btn.reset-layout-btn {

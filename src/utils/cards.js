@@ -24,23 +24,12 @@ export const CARDS_DB = {
       stateHelpers.gainBlock(blk);
     }
   },
-  heal: {
-    key: 'heal',
-    name: "かいふく",
-    type: "skill",
-    cost: 1,
-    rarity: "starter",
-    desc: (upgraded) => `じぶんの HPを ${upgraded ? 7 : 4} かいふくする。`,
-    effect: (player, target, upgraded, stateHelpers) => {
-      const hpVal = upgraded ? 7 : 4;
-      stateHelpers.heal(hpVal);
-    }
-  },
+
   heavy_strike: {
     key: 'heavy_strike',
     name: "つよいこうげき",
     type: "attack",
-    cost: 1,
+    cost: 2,
     rarity: "common",
     desc: (upgraded) => `てきに ${upgraded ? 18 : 12} ダメージを あたえる。`,
     effect: (player, target, upgraded, stateHelpers) => {
@@ -52,7 +41,7 @@ export const CARDS_DB = {
     key: 'iron_shield',
     name: "てっぺきのまもり",
     type: "skill",
-    cost: 1,
+    cost: 2,
     rarity: "common",
     desc: (upgraded) => `ブロックを ${upgraded ? 15 : 10} える。`,
     effect: (player, target, upgraded, stateHelpers) => {
@@ -60,23 +49,12 @@ export const CARDS_DB = {
       stateHelpers.gainBlock(blk);
     }
   },
-  mega_heal: {
-    key: 'mega_heal',
-    name: "だいかいふく",
-    type: "skill",
-    cost: 1,
-    rarity: "rare",
-    desc: (upgraded) => `じぶんの HPを ${upgraded ? 15 : 9} かいふくする。`,
-    effect: (player, target, upgraded, stateHelpers) => {
-      const hpVal = upgraded ? 15 : 9;
-      stateHelpers.heal(hpVal);
-    }
-  },
+
   poison_flask: {
     key: 'poison_flask',
     name: "どくのビン",
     type: "skill",
-    cost: 1,
+    cost: 2,
     rarity: "common",
     desc: (upgraded) => `てきに ${upgraded ? 7 : 5} の「どく」をあたえる。`,
     effect: (player, target, upgraded, stateHelpers) => {
@@ -90,9 +68,9 @@ export const CARDS_DB = {
     type: "attack",
     cost: 1,
     rarity: "rare",
-    desc: (upgraded) => `てきに ${upgraded ? 5 : 3} ダメージ。 ${upgraded ? 3 : 2} 回復。`,
+    desc: (upgraded) => `てきに ${upgraded ? 9 : 6} ダメージ。 ${upgraded ? 3 : 2} 回復する。`,
     effect: (player, target, upgraded, stateHelpers) => {
-      const d = upgraded ? 5 : 3;
+      const d = upgraded ? 9 : 6;
       stateHelpers.dealDamage(d, target);
       stateHelpers.heal(upgraded ? 3 : 2);
     }
@@ -101,7 +79,7 @@ export const CARDS_DB = {
     key: 'shield_bash',
     name: "シールドバッシュ",
     type: "attack",
-    cost: 1,
+    cost: 2,
     rarity: "uncommon",
     desc: (upgraded) => `じぶんのブロックとおなじダメージをあたえる。${upgraded ? 'その後、5ブロックを得る。' : ''}`,
     effect: (player, target, upgraded, stateHelpers) => {
@@ -130,9 +108,9 @@ export const CARDS_DB = {
     key: 'heavy_blade',
     name: "ヘビーブレード",
     type: "attack",
-    cost: 2, // will need energy system, but for now we don't have cost enforced strictly unless we do it. Wait, cost is 1 for all so far. Let's make it 1 but require an action or just high damage.
+    cost: 3,
     rarity: "uncommon",
-    desc: (upgraded) => `てきに ${upgraded ? 25 : 18} ダメージ。「すじりょく」のこうかが ${upgraded ? 5 : 3} 倍になる。`,
+    desc: (upgraded) => `てきに ${upgraded ? 25 : 18} ダメージ。「きんりょく」のこうかが ${upgraded ? 5 : 3} 倍になる。`,
     effect: (player, target, upgraded, stateHelpers) => {
       // For now, simple massive damage. We'll handle strength scaling in stateHelpers.dealDamage
       stateHelpers.dealDamage(upgraded ? 25 : 18, target, { strengthMultiplier: upgraded ? 5 : 3 });

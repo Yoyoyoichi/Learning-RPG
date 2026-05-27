@@ -123,10 +123,10 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
           onClick={() => setActiveTab('words')}
           style={{
             flex: 1,
-            background: activeTab === 'words' ? '#18181b' : 'transparent',
+            background: activeTab === 'words' ? '#f3f4f6' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'words' ? '2px solid #00ff66' : 'none',
-            color: activeTab === 'words' ? '#00ff66' : '#a1a1aa',
+            borderBottom: activeTab === 'words' ? '2px solid #059669' : 'none',
+            color: activeTab === 'words' ? '#059669' : '#4b5563',
             padding: '8px',
             cursor: 'pointer',
             fontSize: '0.85rem',
@@ -140,10 +140,10 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
           onClick={() => setActiveTab('deck')}
           style={{
             flex: 1,
-            background: activeTab === 'deck' ? '#18181b' : 'transparent',
+            background: activeTab === 'deck' ? '#f3f4f6' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'deck' ? '2px solid #ff3e3e' : 'none',
-            color: activeTab === 'deck' ? '#ff3e3e' : '#a1a1aa',
+            borderBottom: activeTab === 'deck' ? '2px solid #dc2626' : 'none',
+            color: activeTab === 'deck' ? '#dc2626' : '#4b5563',
             padding: '8px',
             cursor: 'pointer',
             fontSize: '0.85rem',
@@ -264,7 +264,7 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
                     border: `1px solid ${borderCol}`,
                     borderRadius: '6px',
                     padding: '8px',
-                    background: '#09090b',
+                    background: '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -276,7 +276,7 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ 
                         fontWeight: 'bold', 
-                        color: card.type === 'attack' ? '#fca5a5' : '#93c5fd',
+                        color: card.type === 'attack' ? '#dc2626' : '#0284c7',
                         fontSize: '0.78rem'
                       }}>
                         {card.name}
