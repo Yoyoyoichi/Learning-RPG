@@ -33,7 +33,16 @@ export const generateFloorStory = async (floorNumber) => {
   "rooms": ["...", "...", ...]
 }`;
 
-    const result = await model.generateContent(prompt);
+    // タイムアウトを設定 (8秒)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
     const response = await result.response;
     let text = response.text().trim();
     if (text.startsWith('\`\`\`')) {

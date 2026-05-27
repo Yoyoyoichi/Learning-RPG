@@ -8,7 +8,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #09090b;
+  background-color: #f3f4f6;
   color: #e1e4e8;
   font-family: 'Consolas', 'Courier New', Courier, monospace;
   height: 100vh;
@@ -128,14 +128,14 @@ html, body {
   background: rgba(0, 0, 0, 0.1);
 }
 .game-right-col::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #d1d5db;
   border-radius: 2px;
 }
 
 /* Panel Design */
 .panel {
   background: rgba(18, 18, 22, 0.7);
-  border: 1.5px solid #27272a;
+  border: 1.5px solid #d1d5db;
   border-radius: 10px;
   padding: 0.5rem 0.75rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -148,7 +148,7 @@ html, body {
   font-size: 0.9rem;
   color: #00ff66;
   text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid #d1d5db;
   padding-bottom: 0.3rem;
   text-transform: uppercase;
   display: flex;
@@ -172,14 +172,14 @@ html, body {
 
 .stat-label {
   font-size: 0.7rem;
-  color: #71717a;
+  color: #4b5563;
   text-transform: uppercase;
 }
 
 .stat-value {
   font-size: 0.95rem;
   font-weight: bold;
-  color: #ffffff;
+  color: #111827;
 }
 
 .stat-value.level {
@@ -213,8 +213,8 @@ html, body {
 
 .bar-bg {
   height: 12px;
-  background-color: #18181b;
-  border: 1px solid #27272a;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -244,13 +244,13 @@ html, body {
 
 .inventory-slot {
   flex: 1;
-  background: #09090b;
+  background: #f3f4f6;
   border: 1px dashed #3f3f46;
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   text-align: center;
   font-size: 0.75rem;
-  color: #71717a;
+  color: #4b5563;
   display: flex;
   flex-direction: row;
   gap: 0.3rem;
@@ -261,7 +261,7 @@ html, body {
 
 .inventory-slot.equipped {
   border: 1px solid #00d2ff;
-  color: #fff;
+  color: #111827;
   background: rgba(0, 210, 255, 0.05);
 }
 
@@ -289,14 +289,14 @@ html, body {
   background: rgba(0,0,0,0.1);
 }
 .log-container::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #d1d5db;
   border-radius: 2px;
 }
 
 .log-entry {
   line-height: 1.4;
-  color: #a1a1aa;
-  border-left: 2px solid #27272a;
+  color: #4b5563;
+  border-left: 2px solid #d1d5db;
   padding-left: 0.5rem;
 }
 
@@ -332,7 +332,7 @@ html, body {
   grid-template-columns: repeat(3, 1fr);
   gap: 0.25rem 0.4rem;
   font-size: 0.7rem;
-  color: #a1a1aa;
+  color: #4b5563;
 }
 
 .legend-item {
@@ -362,7 +362,7 @@ html, body {
   box-sizing: border-box;
   background: rgba(39, 39, 42, 0.6);
   border: 1px solid #3f3f46;
-  color: #ffffff;
+  color: #111827;
   font-size: calc(var(--dpad-btn-size) * 0.45);
   font-weight: bold;
   border-radius: 8px;
@@ -381,7 +381,7 @@ html, body {
 
 .dpad-btn:active {
   background: #00ff66;
-  color: #09090b;
+  color: #f3f4f6;
   border-color: #00ff66;
   box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
 }
@@ -442,7 +442,7 @@ html, body {
 
 .overlay-stats {
   font-size: 1.1rem;
-  color: #a1a1aa;
+  color: #4b5563;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -450,11 +450,11 @@ html, body {
 }
 
 .overlay-stats span strong {
-  color: #fff;
+  color: #111827;
 }
 
 .action-btn {
-  background: #09090b;
+  background: #f3f4f6;
   border: 2px solid #00ff66;
   color: #00ff66;
   font-family: inherit;
@@ -469,7 +469,7 @@ html, body {
 
 .action-btn:hover {
   background: #00ff66;
-  color: #09090b;
+  color: #f3f4f6;
   box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
 }
 
@@ -477,8 +477,8 @@ html, body {
   width: 100%;
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
-  border: 1px solid #71717a;
-  color: #71717a;
+  border: 1px solid #4b5563;
+  color: #4b5563;
 }
 
 .action-btn.reset-panel:hover {
@@ -497,10 +497,10 @@ html, body {
 
 .panel-tab-btn {
   background: rgba(18, 18, 22, 0.7);
-  border: 1.5px solid #27272a;
+  border: 1.5px solid #d1d5db;
   border-radius: 6px;
   padding: 6px 12px;
-  color: #a1a1aa;
+  color: #4b5563;
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
@@ -515,7 +515,7 @@ html, body {
 
 .panel-tab-btn:hover {
   border-color: #3f3f46;
-  color: #ffffff;
+  color: #111827;
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -541,9 +541,9 @@ html, body {
 }
 
 .layout-ctrl-btn {
-  background: #18181b;
+  background: #ffffff;
   border: 1px solid #3f3f46;
-  color: #a1a1aa;
+  color: #4b5563;
   font-size: 0.7rem;
   padding: 2px 6px;
   border-radius: 4px;
@@ -562,7 +562,7 @@ html, body {
 .layout-ctrl-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-  border-color: #27272a;
+  border-color: #d1d5db;
   color: #52525b;
 }
 
@@ -580,13 +580,13 @@ html, body {
   background: rgba(0, 0, 0, 0.1);
 }
 .game-left-col::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #d1d5db;
   border-radius: 2px;
 }
 
 /* Ensure map panel is styled beautifully */
 .panel.map-panel {
-  border: 1.5px solid #27272a;
+  border: 1.5px solid #d1d5db;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -627,7 +627,7 @@ html, body {
 .window {
   position: absolute;
   background: rgba(18, 18, 22, 0.95);
-  border: 1.5px solid #27272a;
+  border: 1.5px solid #d1d5db;
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
@@ -644,8 +644,8 @@ html, body {
 }
 
 .window-header {
-  background: #18181b;
-  border-bottom: 1.5px solid #27272a;
+  background: #ffffff;
+  border-bottom: 1.5px solid #d1d5db;
   padding: 6px 10px;
   display: flex;
   justify-content: space-between;
@@ -668,7 +668,7 @@ html, body {
 .window-close-btn {
   background: transparent;
   border: none;
-  color: #71717a;
+  color: #4b5563;
   cursor: pointer;
   font-weight: bold;
   font-size: 0.85rem;
@@ -712,10 +712,10 @@ html, body {
 
 .control-btn {
   background: rgba(18, 18, 22, 0.7);
-  border: 1.5px solid #27272a;
+  border: 1.5px solid #d1d5db;
   border-radius: 6px;
   padding: 6px 12px;
-  color: #a1a1aa;
+  color: #4b5563;
   font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
@@ -729,7 +729,7 @@ html, body {
 
 .control-btn:hover {
   border-color: #3f3f46;
-  color: #fff;
+  color: #111827;
 }
 
 .control-btn.active {
@@ -799,7 +799,7 @@ html, body {
 
 .status-badge.df {
   background: #ea580c;
-  color: #fff;
+  color: #111827;
   border: 1px solid #f97316;
   box-shadow: 0 0 6px #ea580c80;
 }

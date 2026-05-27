@@ -777,18 +777,18 @@ function App() {
     };
 
     return (
-      <div className="battle-screen" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#09090b', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#f3f4f6', gap: '6px' }}>
+      <div className="battle-screen" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#111827', gap: '6px' }}>
         
         {isEnemyTurn && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
-             <h2 style={{ color: '#ff3e3e', textShadow: '2px 2px 0 #000', fontSize: '1.8rem', animation: 'pulse 1s infinite', letterSpacing: '1px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.85)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
+             <h2 style={{ color: '#ff3e3e', textShadow: '1px 1px 0 #fff, -1px -1px 0 #fff', fontSize: '1.8rem', animation: 'pulse 1s infinite', letterSpacing: '1px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
                {enemyActionText}
              </h2>
           </div>
         )}
         
         {/* Arena */}
-        <div className="battle-arena" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: '130px', padding: '4px', borderBottom: '1px dashed #27272a' }}>
+        <div className="battle-arena" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: '130px', padding: '4px', borderBottom: '1px dashed #d1d5db' }}>
           
           {/* Player */}
           <div className="battle-character player-side" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '45%' }}>
@@ -800,14 +800,14 @@ function App() {
                 <span>HP: {player.hp} / {player.maxHp}</span>
                 {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {playerBlock}</span>}
               </div>
-              <div style={{ height: '8px', background: '#27272a', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(player.hp / player.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
               </div>
             </div>
           </div>
 
           {/* Turn Marker */}
-          <div style={{ fontSize: '0.8rem', color: '#71717a', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.8rem', color: '#4b5563', textAlign: 'center' }}>
             <div>ターン</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#ff3e3e' }}>{turn}</div>
           </div>
@@ -822,15 +822,15 @@ function App() {
                 <span>HP: {enemy.hp} / {enemy.maxHp}</span>
                 {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {enemyBlock}</span>}
               </div>
-              <div style={{ height: '8px', background: '#27272a', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(enemy.hp / enemy.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
               </div>
             </div>
 
             {enemyIntent && (
-              <div style={{ marginTop: '4px', background: '#1c1917', border: '1px solid #44403c', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }} title={enemyIntent.text}>
+              <div style={{ marginTop: '4px', background: '#f3f4f6', border: '1px solid #44403c', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }} title={enemyIntent.text}>
                 <span>{getIntentionIcon(enemyIntent)}</span>
-                <span style={{ color: '#d6d3d1' }}>{enemyIntent.name}</span>
+                <span style={{ color: '#d1d5db' }}>{enemyIntent.name}</span>
                 <span style={{ color: '#f87171', fontWeight: 'bold' }}>
                   {enemyIntent.damage !== undefined ? `${enemyIntent.damage}` : ''}
                   {enemyIntent.block !== undefined ? `+${enemyIntent.block}🛡️` : ''}
@@ -842,13 +842,13 @@ function App() {
         </div>
 
         {/* Battle Logs / Feedback */}
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '4px', padding: '6px 8px', height: '48px', overflowY: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', fontSize: '0.85rem', gap: '3px' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '4px', padding: '6px 8px', height: '48px', overflowY: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', fontSize: '0.85rem', gap: '3px' }}>
           {logs.length > 0 ? logs.slice(-2).map((log, i) => (
-            <div key={i} style={{ color: log.type === 'damage-taken' ? '#ef4444' : log.type === 'damage-dealt' ? '#60a5fa' : log.type === 'level-up' ? '#fbbf24' : '#a1a1aa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animation: 'fadeIn 0.2s' }}>
+            <div key={i} style={{ color: log.type === 'damage-taken' ? '#ef4444' : log.type === 'damage-dealt' ? '#60a5fa' : log.type === 'level-up' ? '#fbbf24' : '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animation: 'fadeIn 0.2s' }}>
               &gt; {log.text}
             </div>
           )) : (
-            <div style={{ color: '#71717a', textAlign: 'center' }}>カードをえらんで、クイズにこたえよう！</div>
+            <div style={{ color: '#4b5563', textAlign: 'center' }}>カードをえらんで、クイズにこたえよう！</div>
           )}
         </div>
 
@@ -868,8 +868,8 @@ function App() {
                     height: '110px',
                     border: `1px solid ${borderCol}`,
                     borderRadius: '4px',
-                    background: '#040405',
-                    color: '#f3f4f6',
+                    background: '#f9fafb',
+                    color: '#111827',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -889,7 +889,7 @@ function App() {
                       </span>
                     </div>
                     <span style={{ background: borderCol, color: '#000', fontWeight: 'bold', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', position: 'absolute', top: '-6px', right: '-6px', zIndex: 10, border: '1px solid #fff' }}>{card.cost}</span>
-                    <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#4b5563', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
                       {card.desc}
                     </div>
                   </div>
@@ -898,7 +898,7 @@ function App() {
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #27272a', paddingTop: '8px', paddingBottom: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #d1d5db', paddingTop: '8px', paddingBottom: '4px' }}>
             <div style={{ background: '#1e3a8a', color: '#93c5fd', fontWeight: 'bold', fontSize: '1.2rem', padding: '6px 16px', borderRadius: '8px', border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
               ⚡ {playerEnergy} / {battle.playerMaxEnergy || 3}
             </div>
@@ -907,7 +907,7 @@ function App() {
               style={{
                 padding: '6px 12px',
                 background: '#ef4444',
-                color: '#fff',
+                color: '#111827',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
@@ -956,7 +956,7 @@ function App() {
     };
 
     return (
-      <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: 'radial-gradient(circle, #2d1b10 0%, #0c0602 100%)', border: '1px solid #d97706', borderRadius: '8px', color: '#f3f4f6', gap: '12px' }}>
+      <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #d97706', borderRadius: '8px', color: '#111827', gap: '12px' }}>
         {!showSmithDeck ? (
           <>
             <div style={{ fontSize: '2.5rem', animation: 'pulse 2s infinite' }}>🔥</div>
@@ -974,7 +974,7 @@ function App() {
                   justifyContent: 'space-between',
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #0f766e, #0d9488)',
-                  color: '#fff',
+                  color: '#111827',
                   border: '1px solid #14b8a6',
                   borderRadius: '6px',
                   fontWeight: 'bold',
@@ -994,7 +994,7 @@ function App() {
                   justifyContent: 'space-between',
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #b45309, #d97706)',
-                  color: '#fff',
+                  color: '#111827',
                   border: '1px solid #f59e0b',
                   borderRadius: '6px',
                   fontWeight: 'bold',
@@ -1013,7 +1013,7 @@ function App() {
               <span style={{ fontWeight: 'bold', color: '#f59e0b', fontSize: '0.8rem' }}>つよくするカードをえらんでね:</span>
               <button
                 onClick={() => setCampsite(prev => ({ ...prev, showSmithDeck: false }))}
-                style={{ padding: '2px 6px', background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer' }}
+                style={{ padding: '2px 6px', background: '#d1d5db', color: '#111827', border: 'none', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer' }}
               >
                 もどる
               </button>
@@ -1030,10 +1030,10 @@ function App() {
                       onClick={() => handleSmithSelectCard(card)}
                       style={{
                         padding: '4px',
-                        background: '#1f2937',
+                        background: '#e5e7eb',
                         border: `1px solid ${card.upgraded ? '#4b5563' : '#f59e0b'}`,
                         borderRadius: '4px',
-                        color: card.upgraded ? '#9ca3af' : '#fff',
+                        color: card.upgraded ? '#4b5563' : '#fff',
                         textAlign: 'left',
                         cursor: canUpgrade ? 'pointer' : 'default',
                         opacity: canUpgrade ? 1 : 0.6,
@@ -1042,7 +1042,7 @@ function App() {
                         gap: '1px'
                       }}
                     >
-                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#fef08a' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#4b5563' : '#fef08a' }}>
                         {card.name}
                       </div>
                       <div style={{ fontSize: '0.58rem', lineHeight: '1.2' }}>
@@ -1079,15 +1079,15 @@ function App() {
     };
 
     return (
-      <div className="reward-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '10px', boxSizing: 'border-box', background: '#0a0a0c', border: '1px solid #10b981', borderRadius: '8px', color: '#f3f4f6', gap: '8px' }}>
+      <div className="reward-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #10b981', borderRadius: '8px', color: '#111827', gap: '8px' }}>
         <h2 style={{ color: '#10b981', margin: 0, fontSize: '1rem' }}>戦闘勝利！獲得報酬</h2>
         
-        <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', background: '#18181b', padding: '4px 8px', borderRadius: '4px' }}>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', background: '#ffffff', padding: '4px 8px', borderRadius: '4px' }}>
           <span style={{ color: '#fbbf24' }}>🪙 +{gold} G</span>
           <span style={{ color: '#60a5fa' }}>✨ +{xp} XP</span>
         </div>
 
-        <div style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
+        <div style={{ fontSize: '0.65rem', color: '#4b5563' }}>
           デッキに加えるカードを選んでください：
         </div>
 
@@ -1103,8 +1103,8 @@ function App() {
                   height: '120px',
                   border: `1px solid ${borderCol}`,
                   borderRadius: '4px',
-                  background: '#020617',
-                  color: '#fff',
+                  background: '#ffffff',
+                  color: '#111827',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -1141,7 +1141,7 @@ function App() {
                     {card.desc}
                   </div>
                 </div>
-                <div style={{ fontSize: '0.5rem', color: '#71717a' }}>
+                <div style={{ fontSize: '0.5rem', color: '#4b5563' }}>
                   <span>{card.rarity}</span>
                 </div>
               </button>
@@ -1153,8 +1153,8 @@ function App() {
           onClick={handleSkip}
           style={{
             padding: '3px 10px',
-            background: '#374151',
-            color: '#fff',
+            background: '#d1d5db',
+            color: '#111827',
             border: 'none',
             borderRadius: '4px',
             fontSize: '0.65rem',
@@ -1189,9 +1189,9 @@ function App() {
             top: '20px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(0, 0, 0, 0.85)',
+            background: 'rgba(255, 255, 255, 0.95)',
             border: '1px solid #ff3e3e',
-            color: '#fff',
+            color: '#111827',
             padding: '8px 16px',
             borderRadius: '8px',
             zIndex: 100,
@@ -1220,7 +1220,7 @@ function App() {
             <button className="dpad-btn empty"></button>
           </div>
         ) : (
-          <div className="keyboard-hint" style={{ fontSize: '0.72rem', color: '#71717a', textAlign: 'center', padding: '0.5rem', border: '1px dashed #27272a', borderRadius: '8px', lineHeight: '1.3' }}>
+          <div className="keyboard-hint" style={{ fontSize: '0.72rem', color: '#4b5563', textAlign: 'center', padding: '0.5rem', border: '1px dashed #d1d5db', borderRadius: '8px', lineHeight: '1.3' }}>
             ⌨️ 矢印キー / WASD<br/>で移動できます。<br/>Spaceで待機。
           </div>
         )}
@@ -1435,7 +1435,7 @@ function App() {
     } catch(e) {}
     
     return (
-      <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#09090b', color: '#e4e4e7' }}>
+      <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#f3f4f6', color: '#111827' }}>
         <h3 style={{ margin: 0, color: '#facc15' }}>💾 セーブ＆ロード</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={handleExportSave} style={{ flex: 1, padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
@@ -1448,7 +1448,7 @@ function App() {
         </div>
         
         <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>📝 カスタム問題の追加 (CSV)</h3>
-        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 5px' }}>
+        <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
           フォーマット: ID, カテゴリ, type(choice/input), 問題文, 正解, ダミー1, ダミー2, ダミー3
         </p>
         <label style={{ padding: '8px', background: '#9333ea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
@@ -1464,14 +1464,14 @@ function App() {
         </div>
         
         {Object.keys(stats).length === 0 ? (
-          <div style={{ fontSize: '0.85rem', color: '#71717a' }}>まだ記録がありません。クイズに答えよう！</div>
+          <div style={{ fontSize: '0.85rem', color: '#4b5563' }}>まだ記録がありません。クイズに答えよう！</div>
         ) : (
           <div style={{ fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
             {Object.entries(stats).map(([qId, s]) => {
               const total = s.correct + s.incorrect;
               const rate = total > 0 ? Math.round((s.correct / total) * 100) : 0;
               return (
-                <div key={qId} style={{ background: '#18181b', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
+                <div key={qId} style={{ background: '#ffffff', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
                   <span>Q-ID: {qId}</span>
                   <span>正解: {s.correct} / 不正解: {s.incorrect} ({rate}%)</span>
                 </div>
@@ -2216,11 +2216,11 @@ function App() {
 
       { (isStoryLoading || floorStory) && !gameOver && !gameVictory && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-          <div style={{ background: '#18181b', border: '1px solid #ff3e3e', padding: '30px', borderRadius: '10px', maxWidth: '500px', color: '#f3f4f6', textAlign: 'center', boxShadow: '0 0 20px rgba(255, 62, 62, 0.3)' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #ff3e3e', padding: '30px', borderRadius: '10px', maxWidth: '500px', color: '#111827', textAlign: 'center', boxShadow: '0 0 20px rgba(255, 62, 62, 0.3)' }}>
             <h2 style={{ color: '#ff3e3e', marginBottom: '20px' }}>第 {player.floor} 階層</h2>
             <div style={{ minHeight: '100px', marginBottom: '20px', fontSize: '1.1rem', lineHeight: '1.6' }}>
               {isStoryLoading ? (
-                <span style={{ color: '#a1a1aa', fontStyle: 'italic' }}>Geminiがストーリーを生成中...<br/>(APIキー未設定の場合はすぐに終わります)</span>
+                <span style={{ color: '#4b5563', fontStyle: 'italic' }}>Geminiがストーリーを生成中...<br/>(APIキー未設定の場合はすぐに終わります)</span>
               ) : (
                 floorStory
               )}
@@ -2228,7 +2228,7 @@ function App() {
             <button
               onClick={() => setFloorStory(null)}
               disabled={isStoryLoading}
-              style={{ padding: '10px 30px', fontSize: '1.1rem', background: isStoryLoading ? '#3f3f46' : '#ff3e3e', color: '#fff', border: 'none', borderRadius: '5px', cursor: isStoryLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '10px 30px', fontSize: '1.1rem', background: isStoryLoading ? '#3f3f46' : '#ff3e3e', color: '#111827', border: 'none', borderRadius: '5px', cursor: isStoryLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
             >
               探索を開始する
             </button>
