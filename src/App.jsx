@@ -354,6 +354,7 @@ function App() {
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
   const [battleFocusIndex, setBattleFocusIndex] = useState(0);
+  const [cardRewardFocusIndex, setCardRewardFocusIndex] = useState(0);
   const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
 
   useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
@@ -1378,6 +1379,7 @@ function App() {
         <div style={{ display: 'flex', gap: '4px', width: '100%', justifyContent: 'center' }}>
           {choices.map((card, idx) => {
             const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
+            const isFocused = idx === Math.min(cardRewardFocusIndex, choices.length);
             return (
               <button
                 key={card.id || idx}
@@ -1385,7 +1387,7 @@ function App() {
                 style={{
                   flex: '0 1 100px',
                   height: '120px',
-                  border: `1px solid ${borderCol}`,
+                  border: isFocused ? '3px solid #fbbf24' : `1px solid ${borderCol}`,
                   borderRadius: '4px',
                   background: '#ffffff',
                   color: '#111827',
@@ -1395,11 +1397,11 @@ function App() {
                   padding: '5px',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  boxShadow: `0 3px 5px rgba(0, 0, 0, 0.3)`,
-                  transition: 'transform 0.15s'
+                  boxShadow: isFocused ? `0 0 12px ${borderCol}, 0 0 0 2px #fbbf24` : `0 3px 5px rgba(0, 0, 0, 0.3)`,
+                  transform: isFocused ? 'scale(1.05) translateY(-5px)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
@@ -2512,16 +2514,43 @@ function App() {
         return;
       }
       if (cardReward) {
-        if (e.key >= '1' && e.key <= '3') {
-          const idx = parseInt(e.key) - 1;
-          if (idx < cardReward.length) {
-            e.preventDefault();
-            handleCardRewardSelect(cardReward[idx]);
-          }
-        } else if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
+        const itemCount = cardReward.choices.length + 1; // cards + skip button
+        let currentIdx = Math.min(cardRewardFocusIndex, itemCount - 1);
+        let newIdx = currentIdx;
+
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
           e.preventDefault();
-          handleSkipReward();
+          newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (currentIdx === cardReward.choices.length) {
+            addLog((isStealthMode ? 'カードスキップ。' : '🏃‍♂️ カードスキップ。'), 'system');
+            setCardReward(null);
+          } else {
+            const card = cardReward.choices[currentIdx];
+            setPlayer(prev => ({ ...prev, deck: [...prev.deck, card] }));
+            addLog(`${isStealthMode ? '' : '🎉 '}デッキに「${card.name}」追加。`, 'system');
+            setCardReward(null);
+            setShop(null);
+          }
+          return;
+        } else if (e.key >= '1' && e.key <= '3') {
+          const idx = parseInt(e.key) - 1;
+          if (idx < cardReward.choices.length) {
+            e.preventDefault();
+            const card = cardReward.choices[idx];
+            setPlayer(prev => ({ ...prev, deck: [...prev.deck, card] }));
+            addLog(`${isStealthMode ? '' : '🎉 '}デッキに「${card.name}」追加。`, 'system');
+            setCardReward(null);
+            setShop(null);
+          }
+          return;
         }
+        
+        setCardRewardFocusIndex(newIdx);
         return;
       }
 
