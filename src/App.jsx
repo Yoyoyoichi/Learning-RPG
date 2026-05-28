@@ -355,6 +355,8 @@ function App() {
   const [screenShake, setScreenShake] = useState(false);
   const [battleFocusIndex, setBattleFocusIndex] = useState(0);
   const [cardRewardFocusIndex, setCardRewardFocusIndex] = useState(0);
+  const [campsiteActionFocusIndex, setCampsiteActionFocusIndex] = useState(0);
+  const [campsiteCardFocusIndex, setCampsiteCardFocusIndex] = useState(0);
   const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
 
   useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
@@ -1051,36 +1053,39 @@ function App() {
     );
   };
 
+  const handleCampsiteRest = () => {
+    setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
+    addLog(`${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
+    playLevelUpSound();
+    
+    setTimeout(() => {
+      loadNextFloor(campsite.nextFloorNum);
+      setCampsite(null);
+    }, 1200);
+  };
+
+  const handleCampsiteUpgrade = (card) => {
+    const updatedDeck = player.deck.map(c => {
+      if (c.id === card.id) {
+        return createCardInstance(c.key, true);
+      }
+      return c;
+    });
+
+    setPlayer(prev => ({ ...prev, deck: updatedDeck }));
+    addLog(`${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
+    playLevelUpSound();
+
+    loadNextFloor(campsite.nextFloorNum);
+    setCampsite(null);
+  };
+
   const renderCampsiteContent = () => {
     if (!campsite) return null;
     const { showSmithDeck } = campsite;
 
-    const handleRest = () => {
-      setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
-      addLog(`${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
-      playLevelUpSound();
-      
-      setTimeout(() => {
-        loadNextFloor(campsite.nextFloorNum);
-        setCampsite(null);
-      }, 1200);
-    };
-
-    const handleSmithSelectCard = (card) => {
-      const updatedDeck = player.deck.map(c => {
-        if (c.id === card.id) {
-          return createCardInstance(c.key, true);
-        }
-        return c;
-      });
-
-      setPlayer(prev => ({ ...prev, deck: updatedDeck }));
-      addLog(`${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
-      playLevelUpSound();
-
-      loadNextFloor(campsite.nextFloorNum);
-      setCampsite(null);
-    };
+    const actionFocused = Math.min(campsiteActionFocusIndex, 1);
+    const cardFocused = Math.min(campsiteCardFocusIndex, player.deck.length);
 
     return (
       <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #d97706', borderRadius: '8px', color: '#111827', gap: '12px' }}>
@@ -1094,7 +1099,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '200px', marginTop: '6px' }}>
               <button
-                onClick={handleRest}
+                onClick={handleCampsiteRest}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1102,11 +1107,15 @@ function App() {
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #0f766e, #0d9488)',
                   color: '#111827',
-                  border: '1px solid #14b8a6',
+                  border: actionFocused === 0 ? '3px solid #fbbf24' : '1px solid #14b8a6',
+                  boxShadow: actionFocused === 0 ? '0 0 12px #0f766e, 0 0 0 2px #fbbf24' : 'none',
+                  transform: actionFocused === 0 ? 'scale(1.05)' : 'scale(1)',
                   borderRadius: '6px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
               >
                 <span>{isStealthMode ? '' : '🛌 '}やすむ</span>
@@ -1122,11 +1131,15 @@ function App() {
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #b45309, #d97706)',
                   color: '#111827',
-                  border: '1px solid #f59e0b',
+                  border: actionFocused === 1 ? '3px solid #fbbf24' : '1px solid #f59e0b',
+                  boxShadow: actionFocused === 1 ? '0 0 12px #b45309, 0 0 0 2px #fbbf24' : 'none',
+                  transform: actionFocused === 1 ? 'scale(1.05)' : 'scale(1)',
                   borderRadius: '6px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
               >
                 <span>{isStealthMode ? '' : '🔨 '}きたえる</span>
@@ -1140,7 +1153,19 @@ function App() {
               <span style={{ fontWeight: 'bold', color: '#f59e0b', fontSize: '0.8rem' }}>つよくするカードをえらんでね:</span>
               <button
                 onClick={() => setCampsite(prev => ({ ...prev, showSmithDeck: false }))}
-                style={{ padding: '2px 6px', background: '#d1d5db', color: '#111827', border: 'none', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer' }}
+                style={{ 
+                  padding: '2px 6px', 
+                  background: '#d1d5db', 
+                  color: '#111827', 
+                  border: cardFocused === player.deck.length ? '2px solid #fbbf24' : 'none',
+                  boxShadow: cardFocused === player.deck.length ? '0 0 8px #9ca3af' : 'none',
+                  transform: cardFocused === player.deck.length ? 'scale(1.05)' : 'scale(1)',
+                  borderRadius: '4px', 
+                  fontSize: '0.65rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}
               >
                 もどる
               </button>
@@ -1150,15 +1175,16 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
+                  const isCardFocused = idx === cardFocused;
                   return (
                     <button
                       key={card.id || idx}
                       disabled={!canUpgrade}
-                      onClick={() => handleSmithSelectCard(card)}
+                      onClick={() => handleCampsiteUpgrade(card)}
                       style={{
                         padding: '4px',
                         background: '#ffffff',
-                        border: `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        border: isCardFocused ? '3px solid #fbbf24' : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
                         color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
@@ -1167,7 +1193,10 @@ function App() {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1px',
-                        boxShadow: canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                        boxShadow: isCardFocused ? '0 0 12px #f59e0b, 0 0 0 2px #fbbf24' : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
+                        transform: isCardFocused ? 'scale(1.03)' : 'scale(1)',
+                        transition: 'all 0.15s',
+                        outline: 'none'
                       }}
                     >
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
@@ -2503,17 +2532,54 @@ function App() {
         return;
       }
       if (campsite) {
-        if (!campsite.upgradeMode) {
-          if (e.key === '1') { e.preventDefault(); handleCampsiteAction('rest'); }
-          if (e.key === '2') { e.preventDefault(); handleCampsiteAction('upgrade'); }
-        } else {
-          if (e.key >= '1' && e.key <= '9') {
-            const idx = parseInt(e.key) - 1;
-            if (idx < player.deck.length) {
-              e.preventDefault();
-              handleUpgradeCard(idx);
+        if (!campsite.showSmithDeck) {
+          let currentIdx = Math.min(campsiteActionFocusIndex, 1);
+          let newIdx = currentIdx;
+          if (['ArrowUp', 'ArrowLeft', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx === 0 ? 1 : 0;
+          } else if (['ArrowDown', 'ArrowRight', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx === 0 ? 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === 0) {
+              handleCampsiteRest();
+            } else {
+              setCampsite(prev => ({ ...prev, showSmithDeck: true }));
+              setCampsiteCardFocusIndex(0);
             }
+            return;
           }
+          setCampsiteActionFocusIndex(newIdx);
+        } else {
+          const itemCount = player.deck.length + 1; // deck + back button
+          let currentIdx = Math.min(campsiteCardFocusIndex, itemCount - 1);
+          let newIdx = currentIdx;
+
+          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === player.deck.length) {
+              setCampsite(prev => ({ ...prev, showSmithDeck: false }));
+            } else {
+              const card = player.deck[currentIdx];
+              if (!card.upgraded) {
+                handleCampsiteUpgrade(card);
+              }
+            }
+            return;
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setCampsite(prev => ({ ...prev, showSmithDeck: false }));
+            return;
+          }
+          setCampsiteCardFocusIndex(newIdx);
         }
         return;
       }
@@ -2583,7 +2649,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
