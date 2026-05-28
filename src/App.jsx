@@ -6,6 +6,7 @@ import { getRandomQuestion, setDefaultQuestions } from './utils/questions';
 import { generateFloorStory } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
+import { syncAllToCloud, syncAllFromCloud } from './utils/sync';
 import {
   generateStarterDeck,
   getRandomRewardCards,
@@ -328,6 +329,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [gameOver, setGameOver] = useState(false);
   const [gameVictory, setGameVictory] = useState(false);
+  const [syncToken, setSyncToken] = useState(localStorage.getItem('learning_rpg_sync_token') || '');
 
   // Card deck-building RPG States
   const [battle, setBattle] = useState(null);
@@ -351,6 +353,7 @@ function App() {
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
+  const [battleFocusIndex, setBattleFocusIndex] = useState(0);
   const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
 
   useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
@@ -969,6 +972,7 @@ function App() {
             {hand.map((card, idx) => {
               const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
               const canPlay = playerEnergy >= card.cost;
+              const isFocused = idx === Math.min(battleFocusIndex, hand.length);
               return (
                 <button
                   key={card.id || idx}
@@ -977,7 +981,7 @@ function App() {
                   style={{
                     flex: '0 0 92px',
                     height: '110px',
-                    border: `1px solid ${borderCol}`,
+                    border: isFocused ? `3px solid #fbbf24` : `1px solid ${borderCol}`,
                     borderRadius: '4px',
                     background: '#f9fafb',
                     color: '#111827',
@@ -989,8 +993,10 @@ function App() {
                     transition: 'transform 0.15s',
                     position: 'relative',
                     opacity: canPlay ? 1 : 0.4,
-                    boxShadow: canPlay ? `0 0 6px ${borderCol}60` : 'none',
+                    boxShadow: isFocused ? `0 0 12px ${borderCol}, 0 0 0 2px #fbbf24` : (canPlay ? `0 0 6px ${borderCol}60` : 'none'),
+                    transform: isFocused ? 'scale(1.05) translateY(-5px)' : 'scale(1)',
                     cursor: canPlay ? 'pointer' : 'not-allowed',
+                    outline: 'none',
                   }}
                 >
                   <div>
@@ -1013,21 +1019,30 @@ function App() {
             <div style={{ background: '#1e3a8a', color: '#93c5fd', fontWeight: 'bold', fontSize: '1.2rem', padding: '6px 16px', borderRadius: '8px', border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
               {isStealthMode ? 'Energy: ' : '⚡ '}{playerEnergy} / {battle.playerMaxEnergy || 3}
             </div>
-            <button
-              onClick={handleEndTurn}
-              style={{
-                padding: '6px 12px',
-                background: '#ef4444',
-                color: '#111827',
-                border: 'none',
-                borderRadius: '4px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-              }}
-            >
-              ターン終了
-            </button>
+            {(() => {
+              const isEndTurnFocused = Math.min(battleFocusIndex, battle.hand.length) === battle.hand.length;
+              return (
+                <button
+                  onClick={handleEndTurn}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#ef4444',
+                    color: '#111827',
+                    border: isEndTurnFocused ? '3px solid #fbbf24' : 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: isEndTurnFocused ? '0 0 12px #ef4444' : 'none',
+                    transform: isEndTurnFocused ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'all 0.2s',
+                    outline: 'none',
+                  }}
+                >
+                  ターン終了
+                </button>
+              );
+            })()}
           </div>
         </div>
 
@@ -1710,7 +1725,10 @@ function App() {
   const renderSettingsContent = () => {
     let stats = {};
     try {
-      stats = JSON.parse(localStorage.getItem('learning_rpg_stats') || '{}');
+      const parsed = JSON.parse(localStorage.getItem('learning_rpg_stats') || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        stats = parsed;
+      }
     } catch(e) {}
     
     return (
@@ -1725,6 +1743,50 @@ function App() {
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportSave} />
           </label>
         </div>
+
+        <h3 style={{ margin: '10px 0 0', color: '#14b8a6' }}>{isStealthMode ? '' : '☁️ '}クラウド同期 (GitHub)</h3>
+        <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
+          GitHubのTokenを入力して、PCとiPadのデータを同期します。
+        </p>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <input 
+            type="password" 
+            value={syncToken} 
+            onChange={(e) => setSyncToken(e.target.value)} 
+            placeholder="ghp_..." 
+            style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} 
+          />
+          <button 
+            onClick={async () => {
+              if (!syncToken) return alert('Tokenを入力してください');
+              localStorage.setItem('learning_rpg_sync_token', syncToken);
+              alert('クラウドから読み込んでいます...');
+              const success = await syncAllFromCloud(syncToken);
+              if (success) {
+                alert('同期成功！画面を再読み込みします。');
+                window.location.reload();
+              } else {
+                alert('クラウドにデータが見つかりませんでした。初めての方は「保存」を押してデータを作成してください。');
+              }
+            }}
+            style={{ padding: '8px', background: '#0d9488', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            {isStealthMode ? '' : '☁️ '}読込
+          </button>
+          <button 
+            onClick={async () => {
+              if (!syncToken) return alert('Tokenを入力してください');
+              localStorage.setItem('learning_rpg_sync_token', syncToken);
+              alert('クラウドに保存しています...');
+              const success = await syncAllToCloud();
+              if (success) alert('クラウドへの保存が完了しました！');
+              else alert('保存に失敗しました。');
+            }}
+            style={{ padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            {isStealthMode ? '' : '☁️ '}保存
+          </button>
+        </div>
         
         <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>{isStealthMode ? '' : '📝 '}カスタム問題の追加 (CSV)</h3>
         <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
@@ -1736,10 +1798,16 @@ function App() {
         </label>
         
         <button 
-          onClick={() => {
-            if (window.confirm('ブラウザに保存されたバグデータを消去し、初期状態に戻しますか？')) {
+          onClick={async () => {
+            if (window.confirm('学習記録と問題集のデータをすべてリセットし、初期状態に戻しますか？（クラウド同期中ならクラウドのデータもリセットされます）')) {
               localStorage.removeItem('learning_rpg_custom_questions');
-              alert('バグデータをリセットしました。画面を再読み込みします。');
+              localStorage.removeItem('learning_rpg_stats');
+              
+              if (syncToken) {
+                await syncAllToCloud(); // クラウドも空の状態で上書き
+              }
+              
+              alert('データをすべてリセットしました。画面を再読み込みします。');
               window.location.reload();
             }
           }}
@@ -1760,12 +1828,15 @@ function App() {
         ) : (
           <div style={{ fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
             {Object.entries(stats).map(([qId, s]) => {
-              const total = s.correct + s.incorrect;
-              const rate = total > 0 ? Math.round((s.correct / total) * 100) : 0;
+              if (!s || typeof s !== 'object') return null;
+              const correct = s.correct || 0;
+              const incorrect = s.incorrect || 0;
+              const total = correct + incorrect;
+              const rate = total > 0 ? Math.round((correct / total) * 100) : 0;
               return (
                 <div key={qId} style={{ background: '#ffffff', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
                   <span>Q-ID: {qId}</span>
-                  <span>正解: {s.correct} / 不正解: {s.incorrect} ({rate}%)</span>
+                  <span>正解: {correct} / 不正解: {incorrect} ({rate}%)</span>
                 </div>
               );
             })}
@@ -2382,16 +2453,47 @@ function App() {
       if (activeQuiz) return;
       
       if (battle) {
-        if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+        const itemCount = battle.hand.length + 1;
+        let currentIdx = Math.min(battleFocusIndex, itemCount - 1);
+        let newIdx = currentIdx;
+
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (currentIdx === battle.hand.length) {
+            handleEndTurn();
+          } else {
+            const card = battle.hand[currentIdx];
+            if (battle.playerEnergy >= card.cost) {
+              handleCardClick(card);
+            } else {
+              addLog(`エネルギーが足りない！`, 'system');
+            }
+          }
+          return;
+        } else if (e.key === 'e' || e.key === 'E') {
           e.preventDefault();
           handleEndTurn();
+          return;
         } else if (e.key >= '1' && e.key <= '9') {
           const idx = parseInt(e.key) - 1;
           if (idx < battle.hand.length) {
             e.preventDefault();
-            playCard(battle.hand[idx], idx);
+            const card = battle.hand[idx];
+            if (battle.playerEnergy >= card.cost) {
+              handleCardClick(card);
+            } else {
+              addLog(`エネルギーが足りない！`, 'system');
+            }
           }
+          return;
         }
+        setBattleFocusIndex(newIdx);
         return;
       }
       if (campsite) {
@@ -2448,7 +2550,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
