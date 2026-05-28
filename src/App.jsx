@@ -351,6 +351,20 @@ function App() {
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
+  const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
+
+  useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Shift + S shortcut for stealth mode
+      if (e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        setIsStealthMode(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     fetch('/default_questions.csv')
@@ -639,7 +653,7 @@ function App() {
         let attackStr = intent.multi ? `${baseDmg}x${multi} ダメージ` : `${baseDmg} ダメージ`;
 
         if (finalDmg === 0) {
-          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} 🛡️完全にブロックした！`;
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} \${isStealthMode ? '' : '🛡️'}完全にブロックした！`;
         } else if (playerBlock > 0) {
           actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} (ブロック -${playerBlock} ＝ ${finalDmg}被ダメージ)`;
         } else {
@@ -855,21 +869,21 @@ function App() {
 
     const getEnemySprite = (subType) => {
       switch(subType) {
-        case 'slime': return '🟢';
-        case 'bat': return '🦇';
-        case 'skeleton': return '💀';
-        case 'ghost': return '👻';
-        default: return '👾';
+        case 'slime': return (isStealthMode ? 'Slime' : '🟢');
+        case 'bat': return (isStealthMode ? 'Bat' : '🦇');
+        case 'skeleton': return (isStealthMode ? 'Skeleton' : '💀');
+        case 'ghost': return (isStealthMode ? 'Ghost' : '👻');
+        default: return (isStealthMode ? 'Enemy' : '👾');
       }
     };
 
     const getIntentionIcon = (intent) => {
-      if (!intent) return '❓';
+      if (!intent) return (isStealthMode ? '?' : '❓');
       switch(intent.type) {
-        case 'attack': return intent.multi ? '⚔️⚔️' : '⚔️';
-        case 'defend': return '🛡️';
-        case 'debuff': return '✨';
-        default: return '💤';
+        case 'attack': return intent.multi ? (isStealthMode ? 'Attack(x2)' : '⚔️⚔️') : (isStealthMode ? 'Attack' : '⚔️');
+        case 'defend': return (isStealthMode ? 'Defend' : '🛡️');
+        case 'debuff': return (isStealthMode ? 'Debuff' : '✨');
+        default: return (isStealthMode ? 'Sleep' : '💤');
       }
     };
 
@@ -889,13 +903,13 @@ function App() {
           
           {/* Player */}
           <div className="battle-character player-side" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '45%' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>🛡️👤</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>{isStealthMode ? '' : '🛡️👤'}</div>
             <div style={{ fontWeight: 'bold', fontSize: '1.0rem', color: '#ff3e3e' }}>ゆうしゃ</div>
             
             <div style={{ width: '100%', marginTop: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {player.hp} / {player.maxHp}</span>
-                {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {playerBlock}</span>}
+                {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{isStealthMode ? '' : '🛡️ '}{playerBlock}</span>}
               </div>
               <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(player.hp / player.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
@@ -917,7 +931,7 @@ function App() {
             <div style={{ width: '100%', marginTop: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {enemy.hp} / {enemy.maxHp}</span>
-                {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {enemyBlock}</span>}
+                {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{isStealthMode ? '' : '🛡️ '}{enemyBlock}</span>}
               </div>
               <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(enemy.hp / enemy.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
@@ -930,7 +944,7 @@ function App() {
                 <span style={{ color: '#d1d5db' }}>{enemyIntent.name}</span>
                 <span style={{ color: '#f87171', fontWeight: 'bold' }}>
                   {enemyIntent.damage !== undefined ? `${enemyIntent.damage}` : ''}
-                  {enemyIntent.block !== undefined ? `+${enemyIntent.block}🛡️` : ''}
+                  {enemyIntent.block !== undefined ? (`+${enemyIntent.block}${isStealthMode ? '' : '🛡️'}`) : ''}
                 </span>
               </div>
             )}
@@ -997,7 +1011,7 @@ function App() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #d1d5db', paddingTop: '8px', paddingBottom: '4px' }}>
             <div style={{ background: '#1e3a8a', color: '#93c5fd', fontWeight: 'bold', fontSize: '1.2rem', padding: '6px 16px', borderRadius: '8px', border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
-              ⚡ {playerEnergy} / {battle.playerMaxEnergy || 3}
+              {isStealthMode ? 'Energy: ' : '⚡ '}{playerEnergy} / {battle.playerMaxEnergy || 3}
             </div>
             <button
               onClick={handleEndTurn}
@@ -1027,7 +1041,7 @@ function App() {
 
     const handleRest = () => {
       setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
-      addLog(`🛌 やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
+      addLog(`\${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
       playLevelUpSound();
       
       setTimeout(() => {
@@ -1045,7 +1059,7 @@ function App() {
       });
 
       setPlayer(prev => ({ ...prev, deck: updatedDeck }));
-      addLog(`🔨 きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
+      addLog(`\${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
       playLevelUpSound();
 
       loadNextFloor(campsite.nextFloorNum);
@@ -1056,7 +1070,7 @@ function App() {
       <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #d97706', borderRadius: '8px', color: '#111827', gap: '12px' }}>
         {!showSmithDeck ? (
           <>
-            <div style={{ fontSize: '2.5rem', animation: 'pulse 2s infinite' }}>🔥</div>
+            <div style={{ fontSize: '2.5rem', animation: 'pulse 2s infinite' }}>{isStealthMode ? 'FIRE' : '🔥'}</div>
             <h2 style={{ color: '#f59e0b', margin: 0, fontSize: '1.1rem' }}>キャンプ（休憩場所）</h2>
             <p style={{ fontSize: '0.70rem', color: '#d1d5db', textAlign: 'center', maxWidth: '280px', lineHeight: '1.3' }}>
               つぎのフロアへすすむまえに、たきびのそばでゆっくりやすむか、カードを1枚つよくできます。
@@ -1079,7 +1093,7 @@ function App() {
                   fontSize: '0.8rem'
                 }}
               >
-                <span>🛌 やすむ</span>
+                <span>{isStealthMode ? '' : '🛌 '}やすむ</span>
                 <span style={{ fontSize: '0.65rem' }}>HP ぜんぶかいふく</span>
               </button>
               
@@ -1099,7 +1113,7 @@ function App() {
                   fontSize: '0.8rem'
                 }}
               >
-                <span>🔨 きたえる</span>
+                <span>{isStealthMode ? '' : '🔨 '}きたえる</span>
                 <span style={{ fontSize: '0.65rem' }}>カードをつよくする</span>
               </button>
             </div>
@@ -1323,13 +1337,13 @@ function App() {
         ...prev,
         deck: [...prev.deck, card]
       }));
-      addLog(`🎁 デッキに「${card.name}」を追加した。`, 'system');
+      addLog(`\${isStealthMode ? '' : '🎁 '}デッキに「${card.name}」を追加した。`, 'system');
       setCardReward(null);
     setShop(null);
     };
 
     const handleSkip = () => {
-      addLog("🎁 カード報酬をスキップした。", 'system');
+      addLog((isStealthMode ? 'カード報酬をスキップした。' : '🎁 カード報酬をスキップした。'), 'system');
       setCardReward(null);
     };
 
@@ -1339,7 +1353,7 @@ function App() {
         
         <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', background: '#ffffff', padding: '4px 8px', borderRadius: '4px' }}>
           <span style={{ color: '#fbbf24' }}>🪙 +{gold} G</span>
-          <span style={{ color: '#60a5fa' }}>✨ +{xp} XP</span>
+          <span style={{ color: '#60a5fa' }}>{isStealthMode ? '' : '✨ '}+{xp} XP</span>
         </div>
 
         <div style={{ fontSize: '0.65rem', color: '#4b5563' }}>
@@ -1564,11 +1578,11 @@ function App() {
       </div>
       <div className="inventory-list">
         <div className={`inventory-slot ${player.swordLevel || player.swordEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.swordLevel || player.swordEquipped ? '🗡️' : '➖'}</span>
+          <span className="equip-icon">{player.swordLevel || player.swordEquipped ? (isStealthMode ? 'Swd' : '🗡️') : (isStealthMode ? '-' : '➖')}</span>
           <span>{player.swordLevel || player.swordEquipped ? `剣 Lv.${player.swordLevel || (player.swordEquipped ? 2 : 0)} (開始時 筋力+${player.swordLevel || 2})` : '遺物スロット'}</span>
         </div>
         <div className={`inventory-slot ${player.shieldLevel || player.shieldEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.shieldLevel || player.shieldEquipped ? '🛡️' : '➖'}</span>
+          <span className="equip-icon">{player.shieldLevel || player.shieldEquipped ? (isStealthMode ? 'Defend' : '🛡️') : (isStealthMode ? '-' : '➖')}</span>
           <span>{player.shieldLevel || player.shieldEquipped ? `盾 Lv.${player.shieldLevel || (player.shieldEquipped ? 2 : 0)} (開始時 ブロック+${(player.shieldLevel || 2) * 2})` : '遺物スロット'}</span>
         </div>
       </div>
@@ -1694,30 +1708,30 @@ function App() {
     
     return (
       <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#f3f4f6', color: '#111827' }}>
-        <h3 style={{ margin: 0, color: '#facc15' }}>💾 セーブ＆ロード</h3>
+        <h3 style={{ margin: 0, color: '#facc15' }}>{isStealthMode ? '' : '💾 '}セーブ＆ロード</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={handleExportSave} style={{ flex: 1, padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            📥 セーブ書き出し
+            {isStealthMode ? '' : '📥 '}セーブ書き出し
           </button>
           <label style={{ flex: 1, padding: '8px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
-            📤 セーブ読み込み
+            {isStealthMode ? '' : '📤 '}セーブ読み込み
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportSave} />
           </label>
         </div>
         
-        <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>📝 カスタム問題の追加 (CSV)</h3>
+        <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>{isStealthMode ? '' : '📝 '}カスタム問題の追加 (CSV)</h3>
         <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
           フォーマット: ID, カテゴリ, type(choice/input), 問題文, 正解, ダミー1, ダミー2, ダミー3
         </p>
         <label style={{ padding: '8px', background: '#9333ea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
-          📄 CSVファイルを読み込む
+          {isStealthMode ? '' : '📄 '}CSVファイルを読み込む
           <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImportCSV} />
         </label>
 
-        <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>📊 成績・学習記録</h3>
+        <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>{isStealthMode ? '' : '📊 '}成績・学習記録</h3>
         <div style={{ marginBottom: '8px' }}>
           <button onClick={exportStatsToCSV} style={{ width: '100%', padding: '8px', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            📊 成績をCSVで書き出し (Excel用)
+            {isStealthMode ? '' : '📊 '}成績をCSVで書き出し (Excel用)
           </button>
         </div>
         
@@ -2345,11 +2359,67 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
+      if (gameOver) {
+        if (e.key === 'Enter') startNewGame();
+        return;
+      }
+      if (gameVictory) {
+        if (e.key === 'Enter') startNewGame();
+        return;
+      }
+      if (isStoryLoading || floorStory) {
+        if (!isStoryLoading && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          setFloorStory(null);
+        }
+        return;
+      }
+      if (activeQuiz) return;
+      
+      if (battle) {
+        if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+          e.preventDefault();
+          handleEndTurn();
+        } else if (e.key >= '1' && e.key <= '9') {
+          const idx = parseInt(e.key) - 1;
+          if (idx < battle.hand.length) {
+            e.preventDefault();
+            playCard(battle.hand[idx], idx);
+          }
+        }
+        return;
+      }
+      if (campsite) {
+        if (!campsite.upgradeMode) {
+          if (e.key === '1') { e.preventDefault(); handleCampsiteAction('rest'); }
+          if (e.key === '2') { e.preventDefault(); handleCampsiteAction('upgrade'); }
+        } else {
+          if (e.key >= '1' && e.key <= '9') {
+            const idx = parseInt(e.key) - 1;
+            if (idx < player.deck.length) {
+              e.preventDefault();
+              handleUpgradeCard(idx);
+            }
+          }
+        }
+        return;
+      }
+      if (cardReward) {
+        if (e.key >= '1' && e.key <= '3') {
+          const idx = parseInt(e.key) - 1;
+          if (idx < cardReward.length) {
+            e.preventDefault();
+            handleCardRewardSelect(cardReward[idx]);
+          }
+        } else if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault();
+          handleSkipReward();
+        }
+        return;
+      }
 
       const now = Date.now();
       if (now - lastMoveTimeRef.current < 120) {
-        // 十字キーなどのデフォルトのスクロール挙動を防ぐ
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', ' '].includes(e.key)) {
           e.preventDefault();
         }
@@ -2358,41 +2428,12 @@ function App() {
 
       let moved = false;
       switch(e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          e.preventDefault();
-          handleMove(0, -1);
-          moved = true;
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          e.preventDefault();
-          handleMove(0, 1);
-          moved = true;
-          break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          e.preventDefault();
-          handleMove(-1, 0);
-          moved = true;
-          break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          e.preventDefault();
-          handleMove(1, 0);
-          moved = true;
-          break;
-        case ' ':
-          e.preventDefault();
-          handleWait();
-          moved = true;
-          break;
-        default:
-          break;
+        case 'ArrowUp': case 'w': case 'W': e.preventDefault(); handleMove(0, -1); moved = true; break;
+        case 'ArrowDown': case 's': case 'S': e.preventDefault(); handleMove(0, 1); moved = true; break;
+        case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
+        case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
+        case ' ': e.preventDefault(); handleWait(); moved = true; break;
+        default: break;
       }
 
       if (moved) {
@@ -2402,7 +2443,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
@@ -2448,7 +2489,7 @@ function App() {
   }
 
   return (
-    <div className={`app-container retro-theme ${screenShake ? 'shake-effect flash-damage' : ''}`}>
+    <div className={`app-container retro-theme ${isStealthMode ? 'stealth-theme' : ''} ${screenShake ? 'shake-effect flash-damage' : ''}`}>
       <header className="app-header">
         <div className="header-left">
           <h1>ROGUE-TEXT RPG</h1>
@@ -2461,43 +2502,43 @@ function App() {
               className={`control-btn ${windows.map.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('map')}
             >
-              🗺️ MAP & BATTLE
+              {isStealthMode ? '' : '🗺️ '}MAP & BATTLE
             </button>
             <button 
               className={`control-btn ${windows.status.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('status')}
             >
-              📊 STATUS
+              {isStealthMode ? '' : '📊 '}STATUS
             </button>
             <button 
               className={`control-btn ${windows.logs.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('logs')}
             >
-              📜 LOGS
+              {isStealthMode ? '' : '📜 '}LOGS
             </button>
             <button 
               className={`control-btn ${windows.legend.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('legend')}
             >
-              🔑 LEGEND
+              {isStealthMode ? '' : '🔑 '}LEGEND
             </button>
             <button 
               className={`control-btn ${windows.wordlist.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('wordlist')}
             >
-              📖 DECK & WORDS ({Object.keys(learnedWords).length})
+              {isStealthMode ? '' : '📖 '}DECK & WORDS ({Object.keys(learnedWords).length})
             </button>
             <button 
               className={`control-btn ${windows.settings?.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('settings')}
             >
-              ⚙️ SETTINGS
+              {isStealthMode ? '' : '⚙️ '}SETTINGS
             </button>
             <button 
               className="control-btn reset-layout-btn"
               onClick={resetWindows}
             >
-              🔄 RESET
+              {isStealthMode ? '' : '🔄 '}RESET
             </button>
           </div>
         ) : (
@@ -2507,14 +2548,14 @@ function App() {
               className={`panel-tab-btn ${rightTab === 'status' ? 'active' : ''}`}
               onClick={() => setRightTab('status')}
             >
-              📊 プレイ画面
+              {isStealthMode ? '' : '📊 '}プレイ画面
             </button>
             <button 
               type="button"
               className={`panel-tab-btn ${rightTab === 'wordlist' ? 'active' : ''}`}
               onClick={() => setRightTab('wordlist')}
             >
-              📖 デッキ & 単語 ({Object.keys(learnedWords).length})
+              {isStealthMode ? '' : '📖 '}デッキ & 単語 ({Object.keys(learnedWords).length})
             </button>
           </div>
         )}

@@ -897,3 +897,21 @@ html, body {
   transform: translateY(-2px);
   filter: brightness(1.08);
 }
+
+
+/* Stealth Mode Uniform Fonts */
+.stealth-theme, .stealth-theme * {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  font-family: monospace, sans-serif !important;
+}
+.stealth-theme h1, .stealth-theme h2, .stealth-theme h3, .stealth-theme .overlay-title {
+  font-size: 16px !important;
+  font-weight: bold !important;
+  margin-bottom: 8px !important;
+  animation: none !important;
+  transform: none !important;
+}
+.stealth-theme button {
+  font-size: 14px !important;
+}
