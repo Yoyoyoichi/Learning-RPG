@@ -1441,11 +1441,15 @@ function App() {
             padding: '3px 10px',
             background: '#d1d5db',
             color: '#111827',
-            border: 'none',
+            border: cardRewardFocusIndex === choices.length ? '3px solid #fbbf24' : 'none',
             borderRadius: '4px',
             fontSize: '0.65rem',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            boxShadow: cardRewardFocusIndex === choices.length ? '0 0 12px #9ca3af' : 'none',
+            transform: cardRewardFocusIndex === choices.length ? 'scale(1.05)' : 'scale(1)',
+            transition: 'all 0.15s',
+            outline: 'none'
           }}
         >
           スキップ
