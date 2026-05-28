@@ -1858,16 +1858,13 @@ function App() {
   const startNewGame = () => {
     setIsStoryLoading(true);
     setFloorStory(null);
-    generateFloorStory(1).then(data => {
-      setFloorStory(data.story);
-      chattersPoolRef.current = data.chatters && data.chatters.length > 0 ? data.chatters : [
-        "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-        "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-        "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-      ];
-      chatterIndexRef.current = 0;
-      setIsStoryLoading(false);
-    });
+    setIsStoryLoading(false);
+    chattersPoolRef.current = [
+      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+    ];
+    chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(1);
     setGrid(dungeon.grid);
@@ -1895,16 +1892,13 @@ function App() {
   const loadNextFloor = (nextFloorNum) => {
     setIsStoryLoading(true);
     setFloorStory(null);
-    generateFloorStory(nextFloorNum).then(data => {
-      setFloorStory(data.story);
-      chattersPoolRef.current = data.chatters && data.chatters.length > 0 ? data.chatters : [
-        "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-        "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-        "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-      ];
-      chatterIndexRef.current = 0;
-      setIsStoryLoading(false);
-    });
+    setIsStoryLoading(false);
+    chattersPoolRef.current = [
+      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+    ];
+    chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(nextFloorNum);
     setGrid(dungeon.grid);
@@ -2365,13 +2359,6 @@ function App() {
       }
       if (gameVictory) {
         if (e.key === 'Enter') startNewGame();
-        return;
-      }
-      if (isStoryLoading || floorStory) {
-        if (!isStoryLoading && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          setFloorStory(null);
-        }
         return;
       }
       if (activeQuiz) return;
