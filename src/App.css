@@ -811,24 +811,26 @@ html, body {
   user-select: none;
 }
 
-.battle-card.playable:hover {
-  transform: translateY(-8px) scale(1.05) !important;
-  z-index: 10;
-}
+@media (hover: hover) {
+  .battle-card.playable:hover {
+    transform: translateY(-8px) scale(1.05) !important;
+    z-index: 10;
+  }
 
-.battle-card.playable.attack:hover {
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
-  border-color: #ef4444;
-}
+  .battle-card.playable.attack:hover {
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+    border-color: #ef4444;
+  }
 
-.battle-card.playable.skill:hover {
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
-  border-color: #3b82f6;
-}
+  .battle-card.playable.skill:hover {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+    border-color: #3b82f6;
+  }
 
-.battle-card.playable.power:hover {
-  box-shadow: 0 0 12px rgba(234, 179, 8, 0.8);
-  border-color: #eab308;
+  .battle-card.playable.power:hover {
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.8);
+    border-color: #eab308;
+  }
 }
 
 .battle-card.unplayable {
@@ -868,9 +870,11 @@ html, body {
   transition: transform 0.15s, filter 0.15s;
 }
 
-.campsite-screen button:hover:not(:disabled), .reward-screen button:hover:not(:disabled) {
-  transform: scale(1.02);
-  filter: brightness(1.1);
+@media (hover: hover) {
+  .campsite-screen button:hover:not(:disabled), .reward-screen button:hover:not(:disabled) {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+  }
 }
 
 .campsite-screen button:active:not(:disabled), .reward-screen button:active:not(:disabled) {
@@ -893,9 +897,11 @@ html, body {
   transition: transform 0.15s ease;
 }
 
-.deck-card-item:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .deck-card-item:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+  }
 }
 
 
