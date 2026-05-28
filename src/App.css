@@ -899,7 +899,10 @@ html, body {
 }
 
 
-/* Stealth Mode Uniform Fonts */
+/* Stealth Mode Uniform Fonts & Monochrome */
+.stealth-theme {
+  filter: grayscale(100%) !important;
+}
 .stealth-theme, .stealth-theme * {
   font-size: 14px !important;
   line-height: 1.5 !important;
