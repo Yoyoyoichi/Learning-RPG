@@ -653,7 +653,7 @@ function App() {
         let attackStr = intent.multi ? `${baseDmg}x${multi} ダメージ` : `${baseDmg} ダメージ`;
 
         if (finalDmg === 0) {
-          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} \${isStealthMode ? '' : '🛡️'}完全にブロックした！`;
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} ${isStealthMode ? '' : '🛡️'}完全にブロックした！`;
         } else if (playerBlock > 0) {
           actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} (ブロック -${playerBlock} ＝ ${finalDmg}被ダメージ)`;
         } else {
@@ -1041,7 +1041,7 @@ function App() {
 
     const handleRest = () => {
       setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
-      addLog(`\${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
+      addLog(`${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
       playLevelUpSound();
       
       setTimeout(() => {
@@ -1059,7 +1059,7 @@ function App() {
       });
 
       setPlayer(prev => ({ ...prev, deck: updatedDeck }));
-      addLog(`\${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
+      addLog(`${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
       playLevelUpSound();
 
       loadNextFloor(campsite.nextFloorNum);
@@ -1337,7 +1337,7 @@ function App() {
         ...prev,
         deck: [...prev.deck, card]
       }));
-      addLog(`\${isStealthMode ? '' : '🎁 '}デッキに「${card.name}」を追加した。`, 'system');
+      addLog(`${isStealthMode ? '' : '🎁 '}デッキに「${card.name}」を追加した。`, 'system');
       setCardReward(null);
     setShop(null);
     };
@@ -1655,49 +1655,56 @@ function App() {
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target.result;
-        const lines = text.split('\n');
-        const customQuestions = [];
-        // Expected format: id,category,type,question,answer,choices(comma separated if choice type)
-        // Skip header if first line contains "id"
-        let startIndex = lines[0].toLowerCase().includes('id') ? 1 : 0;
-        
-        for (let i = startIndex; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
+    
+    Papa.parse(file, {
+      skipEmptyLines: true,
+      complete: (results) => {
+        try {
+          const customQuestions = [];
+          const data = results.data;
           
-          const parts = line.split(',');
-          if (parts.length < 5) continue;
-          
-          const type = parts[2].trim();
-          const qObj = {
-            id: parseInt(parts[0].trim()) || (1000 + i),
-            category: parts[1].trim(),
-            type: type,
-            question: parts[3].trim(),
-            answer: parts[4].trim(),
-          };
-          
-          if (type === 'choice' && parts.length >= 8) {
-            qObj.choices = [parts[4].trim(), parts[5].trim(), parts[6].trim(), parts[7].trim()];
+          let startIndex = 0;
+          if (data.length > 0 && data[0].length > 0 && String(data[0][0]).toLowerCase().includes('id')) {
+            startIndex = 1;
           }
           
-          customQuestions.push(qObj);
+          for (let i = startIndex; i < data.length; i++) {
+            const parts = data[i];
+            if (parts.length < 5) continue;
+            
+            const type = parts[2] ? parts[2].trim() : 'choice';
+            const qObj = {
+              id: parseInt(parts[0]) || (1000 + i),
+              category: parts[1] ? parts[1].trim() : '',
+              type: type,
+              question: parts[3] ? parts[3].trim() : '',
+              answer: parts[4] ? parts[4].trim() : '',
+            };
+            
+            if (type === 'choice' && parts.length >= 8) {
+              qObj.choices = [
+                parts[4] ? parts[4].trim() : '', 
+                parts[5] ? parts[5].trim() : '', 
+                parts[6] ? parts[6].trim() : '', 
+                parts[7] ? parts[7].trim() : ''
+              ].filter(Boolean);
+            } else if (type === 'choice') {
+              qObj.choices = [qObj.answer];
+            }
+            
+            customQuestions.push(qObj);
+          }
+          
+          // 余計なことはせず、既存のリストを完全に上書きして切り替える
+          localStorage.setItem('learning_rpg_custom_questions', JSON.stringify(customQuestions));
+          
+          alert(`CSVから問題を ${customQuestions.length} 問ロードしました！\n画面を再読み込みして問題を切り替えます。`);
+          window.location.reload();
+        } catch (err) {
+          alert('CSVの読み込みに失敗しました。');
         }
-        
-        const existingCustom = JSON.parse(localStorage.getItem('learning_rpg_custom_questions') || '[]');
-        const updatedCustom = [...existingCustom, ...customQuestions];
-        localStorage.setItem('learning_rpg_custom_questions', JSON.stringify(updatedCustom));
-        
-        alert(`カスタム問題を ${customQuestions.length} 問追加しました！`);
-      } catch (err) {
-        alert('CSVの読み込みに失敗しました。');
       }
-    };
-    reader.readAsText(file);
+    });
   };
 
   const renderSettingsContent = () => {
@@ -1727,6 +1734,19 @@ function App() {
           {isStealthMode ? '' : '📄 '}CSVファイルを読み込む
           <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImportCSV} />
         </label>
+        
+        <button 
+          onClick={() => {
+            if (window.confirm('ブラウザに保存されたバグデータを消去し、初期状態に戻しますか？')) {
+              localStorage.removeItem('learning_rpg_custom_questions');
+              alert('バグデータをリセットしました。画面を再読み込みします。');
+              window.location.reload();
+            }
+          }}
+          style={{ marginTop: '8px', padding: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', width: '100%' }}
+        >
+          {isStealthMode ? '' : '🗑️ '}バグデータをリセット（初期化）
+        </button>
 
         <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>{isStealthMode ? '' : '📊 '}成績・学習記録</h3>
         <div style={{ marginBottom: '8px' }}>
@@ -1760,12 +1780,10 @@ function App() {
       learnedWords={learnedWords}
       customWordsCount={customWords.length}
       deck={player.deck}
-      onImportCustomWords={(words) => {
-        setCustomWords(words);
-        addLog(`カスタム単語リスト (${words.length}語) を読み込みました！`, 'system');
-      }}
+      onImportCustomWords={handleImportCSV}
       onClearCustomWords={() => {
         setCustomWords([]);
+        localStorage.removeItem('learning_rpg_custom_questions');
         addLog("デフォルトの単語リストに戻しました。", 'system');
       }}
     />

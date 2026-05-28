@@ -7,81 +7,11 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
   const [filter, setFilter] = useState('all'); // 'all', 'review', 'correct'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Handle CSV file upload
+  // Handle CSV file upload by passing to parent
   const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        let parsed = [];
-        if (results.data && results.data.length > 0) {
-          const firstRow = results.data[0];
-          const keys = Object.keys(firstRow);
-          
-          // Identify keys dynamically
-          const englishKey = keys.find(k => 
-            k.toLowerCase().includes('word') || 
-            k.toLowerCase().includes('english') || 
-            k.toLowerCase() === 'en' || 
-            k.toLowerCase() === 'eng'
-          );
-          
-          const japaneseKey = keys.find(k => 
-            k.toLowerCase().includes('meaning') || 
-            k.toLowerCase().includes('japanese') || 
-            k.toLowerCase() === 'ja' || 
-            k.toLowerCase() === 'jp' || 
-            k.toLowerCase() === 'jpn'
-          );
-
-          if (englishKey && japaneseKey) {
-            parsed = results.data.map(row => ({
-              word: row[englishKey] ? row[englishKey].trim() : '',
-              meaning: row[japaneseKey] ? row[japaneseKey].trim() : ''
-            })).filter(r => r.word && r.meaning);
-          }
-        }
-
-        if (parsed.length > 0) {
-          onImportCustomWords(parsed);
-          e.target.value = ''; // Reset file input
-        } else {
-          // If header-based parsing yields nothing, fallback to parsing without headers (index-based)
-          parseHeaderless(file, e);
-        }
-      },
-      error: (err) => {
-        alert("ファイルのロードに失敗しました: " + err.message);
-      }
-    });
-  };
-
-  const parseHeaderless = (file, e) => {
-    Papa.parse(file, {
-      header: false,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const parsed = results.data.map(row => {
-          if (row.length >= 2) {
-            return {
-              word: row[0] ? row[0].trim() : '',
-              meaning: row[1] ? row[1].trim() : ''
-            };
-          }
-          return null;
-        }).filter(r => r && r.word && r.meaning);
-
-        if (parsed.length > 0) {
-          onImportCustomWords(parsed);
-        } else {
-          alert("CSVファイルの読み込みに失敗しました。英語と日本語の2列で構成されているか、ヘッダーに 'word' と 'meaning' を指定してください。");
-        }
-        e.target.value = ''; // Reset input
-      }
-    });
+    if (onImportCustomWords) {
+      onImportCustomWords(e);
+    }
   };
 
   // Convert map/object of learned words to array for filtering & listing
