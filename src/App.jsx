@@ -357,6 +357,7 @@ function App() {
   const [cardRewardFocusIndex, setCardRewardFocusIndex] = useState(0);
   const [campsiteActionFocusIndex, setCampsiteActionFocusIndex] = useState(0);
   const [campsiteCardFocusIndex, setCampsiteCardFocusIndex] = useState(0);
+  const [shopFocusIndex, setShopFocusIndex] = useState(0);
   const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
 
   useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
@@ -1171,84 +1172,93 @@ function App() {
               </button>
             </div>
             
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                {player.deck.map((card, idx) => {
-                  const canUpgrade = !card.upgraded;
-                  const isCardFocused = idx === cardFocused;
-                  return (
-                    <button
-                      key={card.id || idx}
-                      disabled={!canUpgrade}
-                      onClick={() => handleCampsiteUpgrade(card)}
-                      style={{
-                        padding: '4px',
-                        background: '#ffffff',
-                        border: isCardFocused ? '3px solid #fbbf24' : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
-                        borderRadius: '4px',
-                        color: card.upgraded ? '#9ca3af' : '#111827',
-                        textAlign: 'left',
-                        cursor: canUpgrade ? 'pointer' : 'default',
-                        opacity: canUpgrade ? 1 : 0.6,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1px',
-                        boxShadow: isCardFocused ? '0 0 12px #f59e0b, 0 0 0 2px #fbbf24' : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
-                        transform: isCardFocused ? 'scale(1.03)' : 'scale(1)',
-                        transition: 'all 0.15s',
-                        outline: 'none'
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
-                        {card.name}
-                      </div>
-                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2', color: card.upgraded ? '#9ca3af' : '#4b5563' }}>
-                        {card.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
+            <div style={{ flex: 1, overflowY: 'a  const getCardPrice = (card) => {
+    if (card.rarity === 'common') return 50;
+    if (card.rarity === 'uncommon') return 75;
+    if (card.rarity === 'rare') return 100;
+    return 50;
+  };
+
+  const handleShopBuyCard = (card) => {
+    const price = getCardPrice(card);
+    if (player.gold >= price) {
+      setPlayer(prev => ({ ...prev, gold: prev.gold - price, deck: [...prev.deck, card] }));
+      setShop(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== card.id) }));
+      addLog(`🪙 ${price}G支払い、「${card.name}」を購入した。`, 'system');
+    } else {
+      addLog(`ゴールドが足りない！`, 'system');
+    }
+  };
+
+  const handleShopBuyItem = (itemData) => {
+    if (player.gold >= itemData.cost) {
+      setPlayer(prev => {
+        let np = { ...prev, gold: prev.gold - itemData.cost };
+        if (itemData.key === 'potion') { np.hp = Math.min(np.maxHp, np.hp + 25); }
+        else if (itemData.key === 'golden_apple') { np.maxHp += 10; np.hp += 10; }
+        else if (itemData.key === 'energy_crystal') { np.maxEnergy = (np.maxEnergy || 3) + 1; }
+        else if (itemData.key === 'magic_bag') { np.maxDraw = (np.maxDraw || 3) + 1; }
+        return np;
+      });
+      setShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
+      addLog(`🪙 ${itemData.cost}G支払い、「${itemData.name}」を購入した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopBuyWeapon = (weapon) => {
+    if (player.gold >= weapon.cost) {
+      setPlayer(prev => {
+        const np = { ...prev, gold: prev.gold - weapon.cost };
+        if (weapon.key === 'sword') {
+          np.swordLevel = (np.swordLevel || (np.swordEquipped ? 2 : 0)) + 1;
+          np.swordEquipped = true;
+        } else {
+          np.shieldLevel = (np.shieldLevel || (np.shieldEquipped ? 2 : 0)) + 1;
+          np.shieldEquipped = true;
+        }
+        return np;
+      });
+      setShop(prev => ({ ...prev, weapons: prev.weapons.filter(w => w.key !== weapon.key) }));
+      addLog(`🪙 ${weapon.cost}G支払い、「${weapon.name}」を購入した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopHeal = () => {
+    if (player.hp >= player.maxHp) {
+      addLog(`HPはすでに満タンだ。`, 'system');
+    } else if (player.gold >= 30) {
+      setPlayer(prev => ({ ...prev, gold: prev.gold - 30, hp: Math.min(prev.maxHp, prev.hp + 30) }));
+      addLog(`🪙 30G支払い、HPを30回復した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopRemoveCardSelect = (cardIndex) => {
+    if (!shop) return;
+    const { removeCost } = shop;
+    if (player.gold >= removeCost) {
+      setPlayer(prev => {
+        const newDeck = [...prev.deck];
+        const removed = newDeck.splice(cardIndex, 1)[0];
+        addLog(`🪙 ${removeCost}G支払い、「${removed.name}」を削除した。`, 'system');
+        return { ...prev, gold: prev.gold - removeCost, deck: newDeck, removedCount: (prev.removedCount || 0) + 1 };
+      });
+      setShop(prev => ({ ...prev, removeCost: prev.removeCost + 25, removeMode: false }));
+      setShopFocusIndex(0);
+    } else {
+      addLog(`ゴールドが足りない！`, 'system');
+      setShop(prev => ({ ...prev, removeMode: false }));
+      setShopFocusIndex(0);
+    }
+  };
+
+  const handleShopLeave = () => {
+    addLog("ショップをあとにした。", 'system');
+    setShop(null);
   };
 
   const renderShopContent = () => {
     if (!shop) return null;
-    const { cards, items, weapons, removeCost, removeMode } = shop;
-
-    const getCardPrice = (card) => {
-      if (card.rarity === 'common') return 50;
-      if (card.rarity === 'uncommon') return 75;
-      if (card.rarity === 'rare') return 100;
-      return 50;
-    };
-
-    const handleBuyCard = (card) => {
-      const price = getCardPrice(card);
-      if (player.gold >= price) {
-        setPlayer(prev => ({ ...prev, gold: prev.gold - price, deck: [...prev.deck, card] }));
-        setShop(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== card.id) }));
-        addLog(`🪙 ${price}Gを支払い、「${card.name}」を購入した。`, 'system');
-      } else {
-        addLog(`ゴールドが足りない！`, 'system');
-      }
-    };
-
-    const handleBuyItem = (itemData) => {
-      if (player.gold >= itemData.cost) {
-        setPlayer(prev => {
-          let np = { ...prev, gold: prev.gold - itemData.cost };
-          if (itemData.key === 'potion') { np.hp = Math.min(np.maxHp, np.hp + 25); }
-          else if (itemData.key === 'golden_apple') { np.maxHp += 10; np.hp += 10; }
-          else if (itemData.key === 'energy_crystal') { np.maxEnergy = (np.maxEnergy || 3) + 1; }
-          else if (itemData.key === 'magic_bag') { np.maxDraw = (np.maxDraw || 3) + 1; }
-          return np;
-        });
-        setShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
+    const { cards, items, weapons, removeCost, removeMode } = shop;tShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
         addLog(`🪙 ${itemData.cost}G支払い、「${itemData.name}」を購入した。`, 'system');
       } else { addLog(`ゴールドが足りない！`, 'system'); }
     };
@@ -1301,29 +1311,57 @@ function App() {
     };
 
     if (removeMode) {
+      const cancelFocused = Math.min(shopFocusIndex, player.deck.length) === player.deck.length;
       return (
         <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontWeight: 'bold', color: '#dc2626' }}>削除するカードを選んでください ({removeCost}G)</span>
-            <button onClick={() => setShop(prev => ({ ...prev, removeMode: false }))} style={{ padding: '2px 6px', fontSize: '0.7rem' }}>キャンセル</button>
+            <button 
+              onClick={() => { setShop(prev => ({ ...prev, removeMode: false })); setShopFocusIndex(0); }} 
+              style={{ 
+                padding: '2px 6px', 
+                fontSize: '0.7rem',
+                border: cancelFocused ? '2px solid #fbbf24' : '1px solid #9ca3af',
+                boxShadow: cancelFocused ? '0 0 8px #9ca3af' : 'none',
+                transform: cancelFocused ? 'scale(1.05)' : 'scale(1)',
+                transition: 'all 0.1s',
+                outline: 'none'
+              }}
+            >キャンセル</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-              {player.deck.map((card, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleRemoveCardSelect(idx)}
-                  style={{ padding: '4px', background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '4px', textAlign: 'left', cursor: 'pointer' }}
-                >
-                  <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: '#b91c1c' }}>{card.name}</div>
-                  <div style={{ fontSize: '0.6rem' }}>{card.desc}</div>
-                </button>
-              ))}
+              {player.deck.map((card, idx) => {
+                const isFocused = Math.min(shopFocusIndex, player.deck.length) === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleShopRemoveCardSelect(idx)}
+                    style={{ 
+                      padding: '4px', 
+                      background: '#fee2e2', 
+                      border: isFocused ? '3px solid #fbbf24' : '1px solid #ef4444', 
+                      borderRadius: '4px', 
+                      textAlign: 'left', 
+                      cursor: 'pointer',
+                      boxShadow: isFocused ? '0 0 12px #ef4444, 0 0 0 2px #fbbf24' : 'none',
+                      transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'all 0.15s',
+                      outline: 'none'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: '#b91c1c' }}>{card.name}</div>
+                    <div style={{ fontSize: '0.6rem' }}>{card.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
       );
     }
+
+    let renderIdx = 0;
 
     return (
       <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827', gap: '8px', overflowY: 'auto' }}>
@@ -1336,8 +1374,25 @@ function App() {
           {cards.map((card, idx) => {
             const price = getCardPrice(card);
             const canAfford = player.gold >= price;
+            const isFocused = renderIdx++ === Math.min(shopFocusIndex, renderIdx + (shop.cards ? shop.cards.length : 0) + (shop.items ? shop.items.length : 0) + (shop.weapons ? shop.weapons.length : 0) + 3);
             return (
-              <button key={idx} onClick={() => handleBuyCard(card)} style={{ flex: '0 1 100px', border: `1px solid #eab308`, borderRadius: '4px', background: canAfford ? '#ffffff' : '#f3f4f6', padding: '5px', cursor: canAfford ? 'pointer' : 'not-allowed', textAlign: 'left', opacity: canAfford ? 1 : 0.6 }}>
+              <button 
+                key={idx} 
+                onClick={() => handleShopBuyCard(card)} 
+                style={{ 
+                  flex: '0 1 100px', 
+                  border: isFocused ? '3px solid #fbbf24' : `1px solid #eab308`, 
+                  borderRadius: '4px', 
+                  background: canAfford ? '#ffffff' : '#f3f4f6', 
+                  padding: '5px', 
+                  cursor: canAfford ? 'pointer' : 'not-allowed', 
+                  textAlign: 'left', 
+                  opacity: canAfford ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #eab308, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
                 <div style={{ fontWeight: 'bold', fontSize: '0.62rem' }}>{card.name}</div>
                 <div style={{ fontSize: '0.6rem', color: '#f59e0b', textAlign: 'center', marginTop: '4px' }}>{price} G</div>
               </button>
@@ -1348,27 +1403,74 @@ function App() {
         <div style={{ borderTop: '1px dashed #d1d5db', margin: '4px 0' }}></div>
         <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#4b5563', marginBottom: '2px' }}>その他のサービス</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-          {items && items.map((item, idx) => (
-            <button key={`i${idx}`} onClick={() => handleBuyItem(item)} disabled={player.gold < item.cost} style={{ padding: '6px', background: '#fff', border: '1px solid #3b82f6', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= item.cost ? 1 : 0.6 }}>
-              {item.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.cost} G</span>
-            </button>
-          ))}
-          {weapons && weapons.map((w, idx) => (
-            <button key={`w${idx}`} onClick={() => handleBuyWeapon(w)} disabled={player.gold < w.cost} style={{ padding: '6px', background: '#fff', border: '1px solid #8b5cf6', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= w.cost ? 1 : 0.6 }}>
-              {w.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{w.cost} G</span>
-            </button>
-          ))}
-          <button onClick={handleHeal} disabled={player.gold < 30} style={{ padding: '6px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= 30 ? 1 : 0.6 }}>
-            HP30 回復 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>30 G</span>
-          </button>
-          <button onClick={() => setShop(prev => ({ ...prev, removeMode: true }))} disabled={player.gold < removeCost || player.deck.length <= 1} style={{ padding: '6px', background: '#fff', border: '1px solid #ef4444', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= removeCost ? 1 : 0.6 }}>
-            カード削除 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{removeCost} G</span>
-          </button>
+          {items && items.map((item, idx) => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button 
+                key={`i${idx}`} 
+                onClick={() => handleShopBuyItem(item)} 
+                disabled={player.gold < item.cost} 
+                style={{ 
+                  padding: '6px', background: '#fff', 
+                  border: isFocused ? '3px solid #fbbf24' : '1px solid #3b82f6', 
+                  borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= item.cost ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #3b82f6, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
+                {item.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.cost} G</span>
+              </button>
+            );
+          })}
+          {weapons && weapons.map((w, idx) => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button 
+                key={`w${idx}`} 
+                onClick={() => handleShopBuyWeapon(w)} 
+                disabled={player.gold < w.cost} 
+                style={{ 
+                  padding: '6px', background: '#fff', 
+                  border: isFocused ? '3px solid #fbbf24' : '1px solid #8b5cf6', 
+                  borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= w.cost ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #8b5cf6, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
+                {w.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{w.cost} G</span>
+              </button>
+            );
+          })}
+          
+          {(() => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button onClick={handleShopHeal} disabled={player.gold < 30} style={{ padding: '6px', background: '#fff', border: isFocused ? '3px solid #fbbf24' : '1px solid #10b981', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= 30 ? 1 : 0.6, boxShadow: isFocused ? '0 0 12px #10b981, 0 0 0 2px #fbbf24' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+                HP30 回復 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>30 G</span>
+              </button>
+            );
+          })()}
+
+          {(() => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button onClick={() => { setShop(prev => ({ ...prev, removeMode: true })); setShopFocusIndex(0); }} disabled={player.gold < removeCost || player.deck.length <= 1} style={{ padding: '6px', background: '#fff', border: isFocused ? '3px solid #fbbf24' : '1px solid #ef4444', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= removeCost ? 1 : 0.6, boxShadow: isFocused ? '0 0 12px #ef4444, 0 0 0 2px #fbbf24' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+                カード削除 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{removeCost} G</span>
+              </button>
+            );
+          })()}
         </div>
 
-        <button onClick={handleLeaveShop} style={{ marginTop: 'auto', padding: '8px 10px', background: '#d1d5db', color: '#111827', border: 'none', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'center' }}>
-          店を出る
-        </button>
+        {(() => {
+          const isFocused = renderIdx++ === shopFocusIndex;
+          return (
+            <button onClick={handleShopLeave} style={{ marginTop: 'auto', padding: '8px 10px', background: '#d1d5db', color: '#111827', border: isFocused ? '3px solid #fbbf24' : 'none', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'center', boxShadow: isFocused ? '0 0 12px #9ca3af' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+              店を出る
+            </button>
+          );
+        })()}
       </div>
     );
   };
@@ -2624,6 +2726,104 @@ function App() {
         return;
       }
 
+      if (shop) {
+        if (shop.removeMode) {
+          const itemCount = player.deck.length + 1; // deck + cancel
+          let currentIdx = Math.min(shopFocusIndex, itemCount - 1);
+          let newIdx = currentIdx;
+
+          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === player.deck.length) {
+              setShop(prev => ({ ...prev, removeMode: false }));
+              setShopFocusIndex(0);
+            } else {
+              handleShopRemoveCardSelect(currentIdx);
+            }
+            return;
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setShop(prev => ({ ...prev, removeMode: false }));
+            setShopFocusIndex(0);
+            return;
+          }
+          setShopFocusIndex(newIdx);
+        } else {
+          const buyableCount = (shop.cards ? shop.cards.length : 0) 
+                             + (shop.items ? shop.items.length : 0) 
+                             + (shop.weapons ? shop.weapons.length : 0) 
+                             + 3; // Heal, Remove, Leave
+          let currentIdx = Math.min(shopFocusIndex, buyableCount - 1);
+          let newIdx = currentIdx;
+          
+          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx > 0 ? currentIdx - 1 : buyableCount - 1;
+          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx < buyableCount - 1 ? currentIdx + 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            
+            let tempIdx = 0;
+            let actionDone = false;
+            
+            // Cards
+            if (shop.cards && !actionDone) {
+              for (let i=0; i<shop.cards.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyCard(shop.cards[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Items
+            if (shop.items && !actionDone) {
+              for (let i=0; i<shop.items.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyItem(shop.items[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Weapons
+            if (shop.weapons && !actionDone) {
+              for (let i=0; i<shop.weapons.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyWeapon(shop.weapons[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Heal
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { handleShopHeal(); actionDone = true; }
+              tempIdx++;
+            }
+            
+            // Remove
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { 
+                if (player.gold >= shop.removeCost && player.deck.length > 1) {
+                  setShop(prev => ({ ...prev, removeMode: true })); 
+                  setShopFocusIndex(0);
+                } else {
+                  addLog('ゴールドが足りないか、削除できるカードがありません。', 'system');
+                }
+                actionDone = true;
+              }
+              tempIdx++;
+            }
+            
+            // Leave
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { handleShopLeave(); actionDone = true; }
+            }
+          }
+          setShopFocusIndex(newIdx);
+        }
+        return;
+      }
+
       const now = Date.now();
       if (now - lastMoveTimeRef.current < 120) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', ' '].includes(e.key)) {
@@ -2649,7 +2849,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
