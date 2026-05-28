@@ -968,7 +968,7 @@ function App() {
 
         {/* Card Hand and Turn controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingTop: '8px', paddingBottom: '2px', justifyContent: 'center' }}>
             {hand.map((card, idx) => {
               const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
               const canPlay = playerEnergy >= card.cost;
