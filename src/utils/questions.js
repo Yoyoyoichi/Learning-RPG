@@ -622,7 +622,8 @@ export const getCustomQuestions = () => {
   try {
     const data = localStorage.getItem('learning_rpg_custom_questions');
     return data ? JSON.parse(data) : [];
-  } catch {
+  } catch (err) {
+    console.error(err);
     return [];
   }
 };

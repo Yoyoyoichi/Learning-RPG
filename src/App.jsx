@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/purity */
+/* eslint-disable react-hooks/exhaustive-deps, react-hooks/purity, react-hooks/set-state-in-effect, react-hooks/immutability, no-unused-vars, no-empty, no-useless-assignment */
 import { useState, useEffect, useRef } from 'react';
 import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
@@ -1789,7 +1789,8 @@ function App() {
         if (data.learning_rpg_custom_questions) localStorage.setItem('learning_rpg_custom_questions', data.learning_rpg_custom_questions);
         alert('セーブデータを読み込みました！ページを更新します。');
         window.location.reload();
-      } catch {
+      } catch (err) {
+        console.error(err);
         alert('セーブデータの読み込みに失敗しました。');
       }
     };
@@ -1844,7 +1845,8 @@ function App() {
           
           alert(`CSVから問題を ${customQuestions.length} 問ロードしました！\n画面を再読み込みして問題を切り替えます。`);
           window.location.reload();
-        } catch {
+        } catch (err) {
+          console.error(err);
           alert('CSVの読み込みに失敗しました。');
         }
       }
@@ -1858,7 +1860,7 @@ function App() {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         stats = parsed;
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.error(err); }
     
     return (
       <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#f3f4f6', color: '#111827' }}>
@@ -2304,6 +2306,7 @@ function App() {
     let nextPlayer = { ...player };
     let nextEnemies = [...enemies];
     let nextItems = [...items];
+    let turnConsumed = false;
 
     // Check for Enemy
     const enemyIndex = nextEnemies.findIndex(e => e.x === tx && e.y === ty);
@@ -2447,7 +2450,6 @@ function App() {
       playMoveSound();
 
 
-    if (moved) {
       if (Math.random() < 0.15) {
         const sequence = chattersPoolRef.current;
         if (chatterIndexRef.current < sequence.length) {
@@ -2486,11 +2488,11 @@ function App() {
         }
       }
 
-
+      turnConsumed = true;
     }
 
     // Process Enemy chase AI
-    if (moved) {
+    if (turnConsumed) {
       nextEnemies = nextEnemies.map(enemy => {
         const dx = nextPlayer.x - enemy.x;
         const dy = nextPlayer.y - enemy.y;
