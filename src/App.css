@@ -961,3 +961,54 @@ html, body {
   background-color: #d1d5db !important;
   border-color: #d1d5db !important;
 }
+
+/* Stealth theme overrides for Quiz Box */
+.stealth-theme .quiz-box {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+.stealth-theme .quiz-box::after {
+  display: none !important;
+}
+.stealth-theme .quiz-box .question-text,
+.stealth-theme .quiz-box .question-label,
+.stealth-theme .quiz-box .quiz-tag,
+.stealth-theme .quiz-box .quiz-stats-small,
+.stealth-theme .quiz-box .hint-label,
+.stealth-theme .quiz-box .hint-letters,
+.stealth-theme .quiz-box .prompt-arrow {
+  color: #111827 !important;
+  text-shadow: none !important;
+}
+.stealth-theme .quiz-box .input-container {
+  background: #f3f4f6 !important;
+  border-color: #d1d5db !important;
+}
+.stealth-theme .quiz-box .quiz-input {
+  color: #111827 !important;
+}
+.stealth-theme .quiz-box .quiz-input::placeholder {
+  color: #9ca3af !important;
+}
+.stealth-theme .quiz-box .quiz-btn {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: none !important;
+}
+.stealth-theme .quiz-box .quiz-btn:hover:not(:disabled) {
+  background: #e5e7eb !important;
+}
+.stealth-theme .quiz-box .msg-correct {
+  background: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+  text-shadow: none !important;
+}
+.stealth-theme .quiz-box .msg-incorrect {
+  background: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
+  text-shadow: none !important;
+}
