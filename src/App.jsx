@@ -396,6 +396,7 @@ function App() {
               question: row.question,
               answer: row.answer,
               choices: row.type === 'choice' ? [row.answer, row.dummy1, row.dummy2, row.dummy3].filter(Boolean) : undefined,
+              explanation: row.explanation || row['解説'] || null,
             }));
             setDefaultQuestions(formatted);
           }
