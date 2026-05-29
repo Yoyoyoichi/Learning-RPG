@@ -50,8 +50,8 @@ export const generateFloorStory = async (floorNumber) => {
 
     const response = await result.response;
     let text = response.text().trim();
-    if (text.startsWith('\`\`\`')) {
-      text = text.replace(/^\`\`\`(json)?/, '').replace(/\`\`\`$/, '').trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(json)?/, '').replace(/```$/, '').trim();
     }
     return JSON.parse(text);
   } catch (error) {

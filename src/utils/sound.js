@@ -93,7 +93,6 @@ export const playHurtSound = () => {
 
 // Sound 4: Correct Answer (cheerful "pi-ro-rin" C5 -> G5 -> C6)
 export const playCorrectSound = () => {
-  const ctx = getAudioContext();
   const now = 0;
   playNote(523.25, 'sine', 0.1, now, 0.15);       // C5
   playNote(783.99, 'sine', 0.1, now + 0.08, 0.15); // G5
@@ -102,7 +101,6 @@ export const playCorrectSound = () => {
 
 // Sound 5: Incorrect Answer (disappointing buzzing sound F3 -> D3)
 export const playIncorrectSound = () => {
-  const ctx = getAudioContext();
   const now = 0;
   playNote(174.61, 'sawtooth', 0.15, now, 0.2); // F3
   playNote(146.83, 'sawtooth', 0.35, now + 0.1, 0.2); // D3
@@ -118,7 +116,6 @@ export const playLevelUpSound = () => {
 
 // Sound 7: Game Over (tragic descending melody G3 -> Eb3 -> C3)
 export const playGameOverSound = () => {
-  const ctx = getAudioContext();
   const now = 0;
   playNote(196.00, 'sawtooth', 0.3, now, 0.2);       // G3
   playNote(155.56, 'sawtooth', 0.3, now + 0.25, 0.2); // Eb3

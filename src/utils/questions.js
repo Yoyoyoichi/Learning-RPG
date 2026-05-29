@@ -622,7 +622,7 @@ export const getCustomQuestions = () => {
   try {
     const data = localStorage.getItem('learning_rpg_custom_questions');
     return data ? JSON.parse(data) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 };
@@ -632,6 +632,7 @@ export const getCustomQuestions = () => {
 // reviewIds: まちがえた問題のID一覧（30%の確率で再出題）
 // =============================
 export const getRandomQuestion = (floor = 1, reviewIds = []) => {
+  console.debug(floor);
   let selected;
   const customQuestions = getCustomQuestions();
   const allQuestions = customQuestions.length > 0 ? customQuestions : QUESTIONS_DB;

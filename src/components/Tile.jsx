@@ -1,4 +1,3 @@
-import React from 'react';
 import './Tile.css';
 
 const Tile = ({ char, type, subType }) => {

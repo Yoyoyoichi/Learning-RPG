@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { checkAnswer } from '../utils/questions';
 import { recordAnswer } from '../utils/stats';
 import { playCorrectSound, playIncorrectSound } from '../utils/sound';
@@ -26,6 +26,21 @@ const CATEGORY_ICONS = {
 const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
   const [answered, setAnswered] = useState(null); // null | { selected, isCorrect }
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const handleClick = useCallback((choice) => {
+    if (answered) return;
+    const isCorrect = choice === questionObj.answer;
+    setAnswered({ selected: choice, isCorrect });
+    recordAnswer(questionObj.id, isCorrect);
+    
+    if (isCorrect) {
+      playCorrectSound();
+      setTimeout(() => onCorrect(), 900);
+    } else {
+      playIncorrectSound();
+      setTimeout(() => onIncorrect(), 1400);
+    }
+  }, [answered, questionObj, onCorrect, onIncorrect]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -61,22 +76,8 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [answered, selectedIndex, questionObj]);
+  }, [answered, selectedIndex, questionObj, handleClick]);
 
-  const handleClick = (choice) => {
-    if (answered) return;
-    const isCorrect = choice === questionObj.answer;
-    setAnswered({ selected: choice, isCorrect });
-    recordAnswer(questionObj.id, isCorrect);
-    
-    if (isCorrect) {
-      playCorrectSound();
-      setTimeout(() => onCorrect(), 900);
-    } else {
-      playIncorrectSound();
-      setTimeout(() => onIncorrect(), 1400);
-    }
-  };
 
   const getButtonStyle = (choice, idx) => {
     const base = {
@@ -131,7 +132,7 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
             key={idx}
             onClick={() => handleClick(choice)}
             style={getButtonStyle(choice, idx)}
-            onMouseEnter={(e) => {
+            onMouseEnter={() => {
               if (!answered) setSelectedIndex(idx);
             }}
           >

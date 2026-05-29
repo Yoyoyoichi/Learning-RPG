@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import Papa from 'papaparse';
+import { useState } from 'react';
 import './WordListPanel.css';
 
 const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, onClearCustomWords, deck = [] }) => {
@@ -40,8 +39,6 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
   });
 
   // Calculate statistics
-  const totalEncountered = wordsArray.length;
-  const totalCorrect = wordsArray.reduce((acc, curr) => acc + (curr.correctCount > 0 ? 1 : 0), 0);
   const totalReview = wordsArray.filter(w => w.isReview).length;
 
   return (

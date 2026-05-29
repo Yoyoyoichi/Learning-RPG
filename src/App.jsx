@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps, react-hooks/purity */
+import { useState, useEffect, useRef } from 'react';
 import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
@@ -872,7 +873,7 @@ function App() {
 
   const renderBattleContent = () => {
     if (!battle) return null;
-    const { enemy, enemyBlock, enemyStatus, enemyIntent, turn, playerEnergy, playerBlock, playerStatus, hand, drawPile, discardPile, exhaustChoose } = battle;
+    const { enemy, enemyBlock, enemyIntent, turn, playerEnergy, playerBlock, hand } = battle;
 
     const getEnemySprite = (subType) => {
       switch(subType) {
@@ -1180,7 +1181,7 @@ function App() {
                     <button
                       key={card.id || idx}
                       disabled={!canUpgrade}
-                      onClick={() => handleSmithSelectCard(card)}
+                      onClick={() => handleCampsiteUpgrade(card)}
                       style={{
                         padding: '4px',
                         background: '#ffffff',
@@ -1788,7 +1789,7 @@ function App() {
         if (data.learning_rpg_custom_questions) localStorage.setItem('learning_rpg_custom_questions', data.learning_rpg_custom_questions);
         alert('セーブデータを読み込みました！ページを更新します。');
         window.location.reload();
-      } catch (err) {
+      } catch {
         alert('セーブデータの読み込みに失敗しました。');
       }
     };
@@ -1843,7 +1844,7 @@ function App() {
           
           alert(`CSVから問題を ${customQuestions.length} 問ロードしました！\n画面を再読み込みして問題を切り替えます。`);
           window.location.reload();
-        } catch (err) {
+        } catch {
           alert('CSVの読み込みに失敗しました。');
         }
       }
@@ -1857,7 +1858,7 @@ function App() {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         stats = parsed;
       }
-    } catch(e) {}
+    } catch { /* ignore */ }
     
     return (
       <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#f3f4f6', color: '#111827' }}>
@@ -2066,11 +2067,6 @@ function App() {
     }
   }, [logs]);
 
-  // Load first floor on mount
-  useEffect(() => {
-    startNewGame();
-  }, []);
-
   // Initialize/Restart Game
   const startNewGame = () => {
     setIsStoryLoading(true);
@@ -2105,6 +2101,10 @@ function App() {
 
   };
 
+  // Load first floor on mount
+  useEffect(() => {
+    startNewGame();
+  }, []);
   // Set up next floor
   const loadNextFloor = (nextFloorNum) => {
     setIsStoryLoading(true);
@@ -2304,7 +2304,6 @@ function App() {
     let nextPlayer = { ...player };
     let nextEnemies = [...enemies];
     let nextItems = [...items];
-    let turnConsumed = false;
 
     // Check for Enemy
     const enemyIndex = nextEnemies.findIndex(e => e.x === tx && e.y === ty);
@@ -2447,7 +2446,8 @@ function App() {
       nextPlayer.y = ty;
       playMoveSound();
 
-      let chatterTriggered = false;
+
+    if (moved) {
       if (Math.random() < 0.15) {
         const sequence = chattersPoolRef.current;
         if (chatterIndexRef.current < sequence.length) {
@@ -2486,11 +2486,11 @@ function App() {
         }
       }
 
-      turnConsumed = true;
+
     }
 
     // Process Enemy chase AI
-    if (turnConsumed) {
+    if (moved) {
       nextEnemies = nextEnemies.map(enemy => {
         const dx = nextPlayer.x - enemy.x;
         const dy = nextPlayer.y - enemy.y;
@@ -2807,7 +2807,7 @@ function App() {
             
             // Leave
             if (!actionDone) {
-              if (tempIdx === currentIdx) { handleShopLeave(); actionDone = true; }
+              if (tempIdx === currentIdx) { handleShopLeave(); }
             }
           }
           setShopFocusIndex(newIdx);
