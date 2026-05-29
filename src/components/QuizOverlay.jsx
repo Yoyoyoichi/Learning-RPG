@@ -33,12 +33,13 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     setAnswered({ selected: choice, isCorrect });
     recordAnswer(questionObj.id, isCorrect);
     
+    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      setTimeout(() => onCorrect(), 900);
+      if (!hasExplanation) setTimeout(() => onCorrect(), 900);
     } else {
       playIncorrectSound();
-      setTimeout(() => onIncorrect(), 1400);
+      if (!hasExplanation) setTimeout(() => onIncorrect(), 1400);
     }
   }, [answered, questionObj, onCorrect, onIncorrect]);
 
@@ -62,6 +63,10 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
         newIdx = selectedIndex % 2 === 0 && selectedIndex + 1 < count ? selectedIndex + 1 : selectedIndex;
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
+        if (answered) {
+          if (answered.isCorrect) onCorrect(); else onIncorrect();
+          return;
+        }
         handleClick(questionObj.shuffledChoices[selectedIndex]);
         return;
       } else if (['1', '2', '3', '4'].includes(e.key)) {
@@ -145,12 +150,29 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
       </div>
 
       {answered && (
-        <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
-          {answered.isCorrect
-            ? '⭕ せいかい！ すばらしい！'
-            : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
-          }
-        </div>
+        <>
+          <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
+            {answered.isCorrect
+              ? '⭕ せいかい！ すばらしい！'
+              : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
+            }
+          </div>
+          {questionObj.explanation && (
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
+              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
+              {questionObj.explanation}
+            </div>
+          )}
+          {questionObj.explanation && (
+             <button
+               onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+               className="quiz-btn submit-btn"
+               style={{ marginTop: '8px', width: '100%' }}
+             >
+               つぎへ (ENTER)
+             </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -174,18 +196,23 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
-    if (!inputValue.trim() || answered) return;
+    if (answered) {
+      if (answered.isCorrect) onCorrect(); else onIncorrect();
+      return;
+    }
+    if (!inputValue.trim()) return;
 
     const isCorrect = checkAnswer(inputValue, questionObj);
     setAnswered({ isCorrect });
     recordAnswer(questionObj.id, isCorrect);
 
+    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      setTimeout(() => onCorrect(), 900);
+      if (!hasExplanation) setTimeout(() => onCorrect(), 900);
     } else {
       playIncorrectSound();
-      setTimeout(() => onIncorrect(), 1400);
+      if (!hasExplanation) setTimeout(() => onIncorrect(), 1400);
     }
   };
 
@@ -273,24 +300,43 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
         </div>
 
         <div className="quiz-buttons">
-          <button
-            type="submit"
-            className="quiz-btn submit-btn"
-            disabled={!inputValue.trim() || !!answered}
-            style={{ flex: 1 }}
-          >
-            {isMath ? '決定 (ENTER)' : 'こたえる (ENTER)'}
-          </button>
+          {!answered || !questionObj.explanation ? (
+            <button
+              type="submit"
+              className="quiz-btn submit-btn"
+              disabled={!inputValue.trim() || !!answered}
+              style={{ flex: 1 }}
+            >
+              {isMath ? '決定 (ENTER)' : 'こたえる (ENTER)'}
+            </button>
+          ) : null}
         </div>
       </form>
 
       {answered && (
-        <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
-          {answered.isCorrect
-            ? `⭕ せいかい！「${questionObj.answer}」だね！`
-            : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
-          }
-        </div>
+        <>
+          <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
+            {answered.isCorrect
+              ? `⭕ せいかい！「${questionObj.answer}」だね！`
+              : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
+            }
+          </div>
+          {questionObj.explanation && (
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
+              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
+              {questionObj.explanation}
+            </div>
+          )}
+          {questionObj.explanation && (
+             <button
+               onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+               className="quiz-btn submit-btn"
+               style={{ marginTop: '8px', width: '100%' }}
+             >
+               つぎへ (ENTER)
+             </button>
+          )}
+        </>
       )}
     </div>
   );

@@ -389,6 +389,7 @@ function App() {
               question: row.question,
               answer: row.answer,
               choices: row.type === 'choice' ? [row.answer, row.dummy1, row.dummy2, row.dummy3].filter(Boolean) : undefined,
+              explanation: row.explanation || row.解説 || '',
             }));
             setDefaultQuestions(formatted);
           }
@@ -972,7 +973,7 @@ function App() {
         </div>
 
         {/* Card Hand and Turn controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative', zIndex: 5 }}>
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingTop: '8px', paddingBottom: '2px', justifyContent: 'center' }}>
             {hand.map((card, idx) => {
               const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
@@ -1835,6 +1836,9 @@ function App() {
               ].filter(Boolean);
             } else if (type === 'choice') {
               qObj.choices = [qObj.answer];
+            }
+            if (parts.length > 8 && parts[8]) {
+              qObj.explanation = parts[8].trim();
             }
             
             customQuestions.push(qObj);
