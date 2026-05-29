@@ -1012,3 +1012,26 @@ html, body {
   color: #991b1b !important;
   text-shadow: none !important;
 }
+
+/* Force ALL text inside stealth quiz box to be black, overriding inline styles */
+.stealth-theme .quiz-box * {
+  color: #111827 !important;
+  text-shadow: none !important;
+}
+.stealth-theme .quiz-box button {
+  background: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+.stealth-theme .quiz-box button:hover:not(:disabled) {
+  background: #e5e7eb !important;
+}
+.stealth-theme .quiz-box .msg-correct,
+.stealth-theme .quiz-box .msg-correct * {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+.stealth-theme .quiz-box .msg-incorrect,
+.stealth-theme .quiz-box .msg-incorrect * {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
