@@ -45,6 +45,11 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (answered && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        if (answered.isCorrect) onCorrect(); else onIncorrect();
+        return;
+      }
       if (answered) return;
       const count = questionObj.shuffledChoices.length;
       let newIdx = selectedIndex;
@@ -63,10 +68,6 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
         newIdx = selectedIndex % 2 === 0 && selectedIndex + 1 < count ? selectedIndex + 1 : selectedIndex;
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        if (answered) {
-          if (answered.isCorrect) onCorrect(); else onIncorrect();
-          return;
-        }
         handleClick(questionObj.shuffledChoices[selectedIndex]);
         return;
       } else if (['1', '2', '3', '4'].includes(e.key)) {
