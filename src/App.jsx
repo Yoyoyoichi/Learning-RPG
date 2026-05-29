@@ -1172,7 +1172,48 @@ function App() {
               </button>
             </div>
             
-            <div style={{ flex: 1, overflowY: 'a  const getCardPrice = (card) => {
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                {player.deck.map((card, idx) => {
+                  const canUpgrade = !card.upgraded;
+                  return (
+                    <button
+                      key={card.id || idx}
+                      disabled={!canUpgrade}
+                      onClick={() => handleSmithSelectCard(card)}
+                      style={{
+                        padding: '4px',
+                        background: '#ffffff',
+                        border: `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        borderRadius: '4px',
+                        color: card.upgraded ? '#9ca3af' : '#111827',
+                        textAlign: 'left',
+                        cursor: canUpgrade ? 'pointer' : 'default',
+                        opacity: canUpgrade ? 1 : 0.6,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1px',
+                        boxShadow: canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
+                        {card.name}
+                      </div>
+                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2', color: card.upgraded ? '#9ca3af' : '#4b5563' }}>
+                        {card.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getCardPrice = (card) => {
     if (card.rarity === 'common') return 50;
     if (card.rarity === 'uncommon') return 75;
     if (card.rarity === 'rare') return 100;
@@ -1258,57 +1299,7 @@ function App() {
 
   const renderShopContent = () => {
     if (!shop) return null;
-    const { cards, items, weapons, removeCost, removeMode } = shop;tShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
-        addLog(`🪙 ${itemData.cost}G支払い、「${itemData.name}」を購入した。`, 'system');
-      } else { addLog(`ゴールドが足りない！`, 'system'); }
-    };
-
-    const handleBuyWeapon = (weapon) => {
-      if (player.gold >= weapon.cost) {
-        setPlayer(prev => {
-          const np = { ...prev, gold: prev.gold - weapon.cost };
-          if (weapon.key === 'sword') {
-            np.swordLevel = (np.swordLevel || (np.swordEquipped ? 2 : 0)) + 1;
-            np.swordEquipped = true;
-          } else {
-            np.shieldLevel = (np.shieldLevel || (np.shieldEquipped ? 2 : 0)) + 1;
-            np.shieldEquipped = true;
-          }
-          return np;
-        });
-        setShop(prev => ({ ...prev, weapons: prev.weapons.filter(w => w.key !== weapon.key) }));
-        addLog(`🪙 ${weapon.cost}G支払い、「${weapon.name}」を購入した。`, 'system');
-      } else { addLog(`ゴールドが足りない！`, 'system'); }
-    };
-
-    const handleHeal = () => {
-      if (player.hp >= player.maxHp) {
-        addLog(`HPはすでに満タンだ。`, 'system');
-      } else if (player.gold >= 30) {
-        setPlayer(prev => ({ ...prev, gold: prev.gold - 30, hp: Math.min(prev.maxHp, prev.hp + 30) }));
-        addLog(`🪙 30G支払い、HPを30回復した。`, 'system');
-      } else { addLog(`ゴールドが足りない！`, 'system'); }
-    };
-
-    const handleRemoveCardSelect = (cardIndex) => {
-      if (player.gold >= removeCost) {
-        setPlayer(prev => {
-          const newDeck = [...prev.deck];
-          const removed = newDeck.splice(cardIndex, 1)[0];
-          addLog(`🪙 ${removeCost}G支払い、「${removed.name}」を削除した。`, 'system');
-          return { ...prev, gold: prev.gold - removeCost, deck: newDeck, removedCount: (prev.removedCount || 0) + 1 };
-        });
-        setShop(prev => ({ ...prev, removeCost: prev.removeCost + 25, removeMode: false }));
-      } else {
-        addLog(`ゴールドが足りない！`, 'system');
-        setShop(prev => ({ ...prev, removeMode: false }));
-      }
-    };
-
-    const handleLeaveShop = () => {
-      addLog("ショップをあとにした。", 'system');
-      setShop(null);
-    };
+    const { cards, items, weapons, removeCost, removeMode } = shop;
 
     if (removeMode) {
       const cancelFocused = Math.min(shopFocusIndex, player.deck.length) === player.deck.length;
