@@ -314,7 +314,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
       </form>
 
       {answered && (
-        <>
+        <div style={{ marginTop: '10px' }}>
           <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
             {answered.isCorrect
               ? `⭕ せいかい！「${questionObj.answer}」だね！`
@@ -322,21 +322,22 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
             }
           </div>
           {questionObj.explanation && (
-            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
-              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
+            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f46', borderRadius: '6px', padding: '10px', marginTop: '8px', fontSize: '0.85rem', color: '#e4e4e7', lineHeight: '1.4' }} className="explanation-box">
+              <strong style={{ color: '#fbbf24' }}>💡 解説:</strong><br/>
               {questionObj.explanation}
             </div>
           )}
           {questionObj.explanation && (
-             <button
-               onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
-               className="quiz-btn submit-btn"
-               style={{ marginTop: '8px', width: '100%' }}
-             >
-               つぎへ (ENTER)
-             </button>
+            <button 
+              type="button"
+              className="quiz-btn submit-btn" 
+              style={{ width: '100%', marginTop: '10px', padding: '10px' }} 
+              onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+            >
+              次へ進む (Enter)
+            </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );
