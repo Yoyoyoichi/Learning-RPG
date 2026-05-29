@@ -375,7 +375,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetch(import.meta.env.BASE_URL + 'default_questions.csv')
+    fetch(import.meta.env.BASE_URL + 'default_questions.csv?v=' + Date.now())
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch default questions');
         return res.text();
