@@ -375,13 +375,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetch('/default_questions.csv')
-      .then(res => res.text())
+    fetch(import.meta.env.BASE_URL + 'default_questions.csv')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch default questions');
+        return res.text();
+      })
       .then(csvText => {
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
+            if (!results.data || results.data.length === 0 || !results.data[0].question) {
+              console.error('Invalid CSV data');
+              return;
+            }
             const formatted = results.data.map(row => ({
               id: parseInt(row.id) || Date.now(),
               category: row.category,
