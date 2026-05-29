@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
-import { getRandomQuestion, setDefaultQuestions } from './utils/questions';
+import { getRandomQuestion, setDefaultQuestions, getCustomQuestions, QUESTIONS_DB } from './utils/questions';
 import { generateFloorStory } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
@@ -3019,6 +3019,13 @@ function App() {
           </button>
         </div>
       )}
+      {/* Debug Info */}
+      <div style={{ position: 'fixed', bottom: 5, right: 5, fontSize: '10px', color: '#fff', background: 'rgba(0,0,0,0.7)', padding: '4px', zIndex: 9999 }}>
+        Questions: {getCustomQuestions().length > 0 ? `Custom (${getCustomQuestions().length})` : 'Default'} 
+        | Loaded: {QUESTIONS_DB.length}
+        | Exps: {QUESTIONS_DB.filter(q => q.explanation).length}
+      </div>
+
     </div>
   );
 }
