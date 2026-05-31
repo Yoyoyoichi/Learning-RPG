@@ -2663,12 +2663,18 @@ function App() {
           let currentIdx = Math.min(campsiteCardFocusIndex, itemCount - 1);
           let newIdx = currentIdx;
 
-          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+          if (['ArrowLeft', 'a', 'A'].includes(e.key)) {
             e.preventDefault();
             newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
-          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+          } else if (['ArrowRight', 'd', 'D'].includes(e.key)) {
             e.preventDefault();
             newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+          } else if (['ArrowUp', 'w', 'W'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx - 2 >= 0 ? currentIdx - 2 : currentIdx;
+          } else if (['ArrowDown', 's', 'S'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx + 2 < itemCount ? currentIdx + 2 : currentIdx;
           } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             if (currentIdx === player.deck.length) {
