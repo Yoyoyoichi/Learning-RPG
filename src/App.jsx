@@ -2877,12 +2877,6 @@ function App() {
         case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
         case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
         case ' ': e.preventDefault(); handleWait(); moved = true; break;
-        case 'c': case 'C': 
-          e.preventDefault(); 
-          if (!gameOver && !gameVictory && !battle) {
-            setCampsite({ nextFloorNum: player.floor + 1, showSmithDeck: false });
-          }
-          break;
         default: break;
       }
 
