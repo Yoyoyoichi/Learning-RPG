@@ -2594,7 +2594,7 @@ function App() {
       if (activeQuiz) return;
       
       if (battle) {
-        if (battle.battleLog.length > 0) {
+        if (battle.battleLog && battle.battleLog.length > 0) {
           if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
             e.preventDefault();
             setBattle(prev => ({ ...prev, battleLog: [] }));
