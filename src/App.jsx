@@ -334,7 +334,11 @@ function App() {
 
   // Card deck-building RPG States
   const [battle, setBattle] = useState(null);
-  const [campsite, setCampsite] = useState(null);
+  const [campsite, setCampsite] = useState(
+    window.location.search.includes('test=camp') 
+      ? { nextFloorNum: 2, showSmithDeck: true } 
+      : null
+  );
   const [cardReward, setCardReward] = useState(null);
   const [shop, setShop] = useState(null);
 
