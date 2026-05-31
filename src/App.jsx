@@ -1185,6 +1185,7 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
+                  const isFocused = idx === cardFocused;
                   return (
                     <button
                       key={card.id || idx}
@@ -1193,7 +1194,7 @@ function App() {
                       style={{
                         padding: '4px',
                         background: '#ffffff',
-                        border: `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        border: isFocused ? `3px solid #fbbf24` : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
                         color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
@@ -1202,7 +1203,7 @@ function App() {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1px',
-                        boxShadow: canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                        boxShadow: isFocused ? `0 0 12px #b45309, 0 0 0 2px #fbbf24` : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none')
                       }}
                     >
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
@@ -2606,10 +2607,10 @@ function App() {
         let currentIdx = Math.min(battleFocusIndex, itemCount - 1);
         let newIdx = currentIdx;
 
-        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        if (['ArrowLeft', 'ArrowUp', 'a', 'w', 'A', 'W'].includes(e.key)) {
           e.preventDefault();
           newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
-        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        } else if (['ArrowRight', 'ArrowDown', 'd', 's', 'D', 'S'].includes(e.key)) {
           e.preventDefault();
           newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
         } else if (e.key === 'Enter' || e.key === ' ') {
