@@ -82,6 +82,7 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answered, selectedIndex, questionObj, handleClick]);
 
 
