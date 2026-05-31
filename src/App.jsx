@@ -1193,8 +1193,8 @@ function App() {
                       onClick={() => handleCampsiteUpgrade(card)}
                       style={{
                         padding: '4px',
-                        background: '#ffffff',
-                        border: isFocused ? `3px solid #fbbf24` : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        background: isFocused ? '#fef08a' : '#ffffff',
+                        border: isFocused ? `3px solid #f59e0b` : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
                         color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
@@ -1203,7 +1203,9 @@ function App() {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1px',
-                        boxShadow: isFocused ? `0 0 12px #b45309, 0 0 0 2px #fbbf24` : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none')
+                        boxShadow: isFocused ? `0 0 16px #fbbf24, 0 0 0 4px #f59e0b` : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
+                        transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'transform 0.15s, box-shadow 0.15s'
                       }}
                     >
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
@@ -2696,6 +2698,7 @@ function App() {
             e.preventDefault();
             if (currentIdx === N) newIdx = N > 0 ? 0 : N;
             else if (currentIdx + 2 < N) newIdx = currentIdx + 2;
+            else newIdx = N;
           } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             if (currentIdx === player.deck.length) {
