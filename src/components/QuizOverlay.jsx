@@ -36,10 +36,10 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      if (!hasExplanation) setTimeout(() => onCorrect(), 900);
+      setTimeout(() => onCorrect(), hasExplanation ? 2500 : 900);
     } else {
       playIncorrectSound();
-      if (!hasExplanation) setTimeout(() => onIncorrect(), 1400);
+      setTimeout(() => onIncorrect(), hasExplanation ? 3500 : 1400);
     }
   }, [answered, questionObj, onCorrect, onIncorrect]);
 

@@ -2594,6 +2594,14 @@ function App() {
       if (activeQuiz) return;
       
       if (battle) {
+        if (battle.battleLog.length > 0) {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+            e.preventDefault();
+            setBattle(prev => ({ ...prev, battleLog: [] }));
+          }
+          return;
+        }
+
         const itemCount = battle.hand.length + 1;
         let currentIdx = Math.min(battleFocusIndex, itemCount - 1);
         let newIdx = currentIdx;
@@ -2668,11 +2676,15 @@ function App() {
             e.preventDefault();
             if (currentIdx !== N) {
               newIdx = (currentIdx % 2 === 1) ? currentIdx - 1 : Math.min(currentIdx + 1, N - 1);
+            } else if (N > 0) {
+              newIdx = N - 1;
             }
           } else if (['ArrowRight', 'd', 'D'].includes(e.key)) {
             e.preventDefault();
             if (currentIdx !== N) {
               newIdx = (currentIdx % 2 === 0) ? Math.min(currentIdx + 1, N - 1) : currentIdx - 1;
+            } else if (N > 0) {
+              newIdx = 0;
             }
           } else if (['ArrowUp', 'w', 'W'].includes(e.key)) {
             e.preventDefault();

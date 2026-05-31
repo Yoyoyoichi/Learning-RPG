@@ -653,7 +653,8 @@ export const getRandomQuestion = (floor = 1, reviewIds = []) => {
 
   // 4択の場合は選択肢をシャッフル
   if (selected.type === 'choice') {
-    const shuffledChoices = [...selected.choices].sort(() => Math.random() - 0.5);
+    const choicesToUse = selected.choices && selected.choices.length > 0 ? selected.choices : [selected.answer];
+    const shuffledChoices = [...choicesToUse].sort(() => Math.random() - 0.5);
     return { ...selected, shuffledChoices };
   }
 
