@@ -1185,7 +1185,7 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
-                  const isFocused = idx === cardFocused;
+                  const isFocused = idx === campsiteCardFocusIndex;
                   return (
                     <button
                       key={card.id || idx}
