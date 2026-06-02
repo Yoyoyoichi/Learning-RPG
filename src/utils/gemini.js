@@ -67,3 +67,50 @@ export const generateFloorStory = async (floorNumber) => {
     };
   }
 };
+
+export const generateQuizFeedback = async (question, answer, userAnswer, isCorrect, enemyName) => {
+  if (!genAI) {
+    return null;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師であり、同時に敵モンスター（${enemyName}）の役割も演じます。
+以下のクイズに対して、プレイヤーが回答しました。
+
+問題: ${question}
+正解: ${answer}
+プレイヤーの回答: ${userAnswer}
+判定: ${isCorrect ? '正解' : '不正解'}
+
+以下の2つの情報をJSONフォーマットで出力してください。
+1. "tutorExplanation": 不正解の場合は、なぜ間違えたのかを推測し、優しい魔法使いのような口調で解き方を教えてください。正解の場合は、「お見事です！」のような短い称賛の言葉をください。（100文字程度）
+2. "enemyReaction": 敵（${enemyName}）のリアクション。正解されたら悔しがり、不正解ならクイズの内容に絡めて煽ってください。（50文字程度）
+
+必ず以下のようなJSONのみを出力してください（マークダウンのバッククォートなどは含めないこと）。
+{
+  "tutorExplanation": "...",
+  "enemyReaction": "..."
+}`;
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    const response = await result.response;
+    let text = response.text().trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API Feedback Error:", error);
+    return null;
+  }
+};

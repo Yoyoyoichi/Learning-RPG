@@ -1661,6 +1661,7 @@ function App() {
             questionObj={activeQuiz.questionObj}
             onCorrect={() => resolveCombatTurn(true)}
             onIncorrect={() => resolveCombatTurn(false)}
+            enemyName={battle ? battle.enemy.name : '謎の敵'}
           />
         </div>
       );
