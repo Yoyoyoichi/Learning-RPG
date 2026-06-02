@@ -1185,6 +1185,7 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
+                  const isFocused = cardFocused === idx;
                   return (
                     <button
                       key={card.id || idx}
@@ -1193,7 +1194,7 @@ function App() {
                       style={{
                         padding: '4px',
                         background: '#ffffff',
-                        border: `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        border: isFocused ? '3px solid #fbbf24' : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
                         color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
@@ -1202,7 +1203,10 @@ function App() {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1px',
-                        boxShadow: canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                        boxShadow: isFocused ? '0 0 12px #f59e0b, 0 0 0 2px #fbbf24' : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
+                        transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'all 0.15s',
+                        outline: 'none'
                       }}
                     >
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
