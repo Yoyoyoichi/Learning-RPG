@@ -621,7 +621,9 @@ export const setDefaultQuestions = (data) => {
 export const getCustomQuestions = () => {
   try {
     const data = localStorage.getItem('learning_rpg_custom_questions');
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
   } catch (err) {
     console.error(err);
     return [];
