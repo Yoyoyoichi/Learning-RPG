@@ -233,8 +233,8 @@ const generateDungeon = (floor) => {
 const INITIAL_PLAYER = {
   x: 0,
   y: 0,
-  hp: 80,
-  maxHp: 80,
+  hp: 30,
+  maxHp: 30,
   atk: 0,
   def: 0,
   level: 1,
