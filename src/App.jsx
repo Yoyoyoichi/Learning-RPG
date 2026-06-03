@@ -4,7 +4,7 @@ import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
 import { getRandomQuestion, setDefaultQuestions, getCustomQuestions, QUESTIONS_DB } from './utils/questions';
-import { generateFloorStory, generateGameStateComment } from './utils/gemini';
+import { generateFloorStory, generateGameStateComment, generateQuizHint } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
 import { syncAllToCloud, syncAllFromCloud } from './utils/sync';
@@ -2303,17 +2303,23 @@ function App() {
   const triggerAIComment = async () => {
     if (aiComment) return;
 
-    const gameState = {
-      hp: player.hp,
-      maxHp: player.maxHp,
-      floor: player.floor,
-      inBattle: !!battle,
-      enemyName: battle ? battle.enemy.name : null,
-      enemyHp: battle ? battle.enemy.hp : null
-    };
-
     setAiComment({ loading: true });
-    const result = await generateGameStateComment(gameState);
+
+    let result;
+    if (activeQuiz && activeQuiz.questionObj) {
+      result = await generateQuizHint(activeQuiz.questionObj);
+    } else {
+      const gameState = {
+        hp: player.hp,
+        maxHp: player.maxHp,
+        floor: player.floor,
+        inBattle: !!battle,
+        enemyName: battle ? battle.enemy.name : null,
+        enemyHp: battle ? battle.enemy.hp : null
+      };
+      result = await generateGameStateComment(gameState);
+    }
+    
     
     if (result && result.comment) {
       setAiComment({ text: result.comment, loading: false });
@@ -2610,6 +2616,18 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ignore if typing in an input field (e.g. Spelling Quiz)
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        return;
+      }
+
+      // Global AI Comment shortcut
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        triggerAIComment();
+        return;
+      }
+
       if (gameOver) {
         if (e.key === 'Enter') startNewGame();
         return;
@@ -2896,7 +2914,7 @@ function App() {
         case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
         case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
         case ' ': e.preventDefault(); handleWait(); moved = true; break;
-        case 'c': case 'C': e.preventDefault(); triggerAIComment(); break;
+        
         default: break;
       }
 
