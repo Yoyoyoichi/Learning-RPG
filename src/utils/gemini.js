@@ -1,4 +1,4 @@
-// import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const getGenAI = () => {
   const storedKey = localStorage.getItem('GEMINI_API_KEY');
@@ -6,8 +6,7 @@ const getGenAI = () => {
   const apiKey = storedKey || envKey;
   
   if (apiKey && apiKey !== "ここにAPIキーを貼り付けてください") {
-    // return new GoogleGenerativeAI(apiKey);
-    return null;
+    return new GoogleGenerativeAI(apiKey);
   }
   return null;
 };
