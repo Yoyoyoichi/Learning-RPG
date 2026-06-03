@@ -2561,28 +2561,41 @@ function App() {
         const dy = nextPlayer.y - enemy.y;
         const dist = Math.abs(dx) + Math.abs(dy);
 
-        if (dist === 1) {
-          return enemy;
-        } else if (dist <= 5) {
+        if (dist === 1) return enemy;
+
+        if (dist <= 5) {
           const stepX = Math.sign(dx);
           const stepY = Math.sign(dy);
 
-          let nextX = enemy.x + stepX;
-          let nextY = enemy.y;
+          // ランダムにX軸・Y軸どちらを優先するか決める
+          let axes = Math.random() > 0.5 
+            ? [{x: stepX, y: 0}, {x: 0, y: stepY}] 
+            : [{x: 0, y: stepY}, {x: stepX, y: 0}];
 
-          let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-          let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
+          for (let axis of axes) {
+            if (axis.x === 0 && axis.y === 0) continue;
+            let nextX = enemy.x + axis.x;
+            let nextY = enemy.y + axis.y;
 
-          if (isBlocked || isOccupied) {
-            nextX = enemy.x;
-            nextY = enemy.y + stepY;
-            
-            isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-            isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
+            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+            let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
+
+            if (!isBlocked && !isOccupied) {
+              return { ...enemy, x: nextX, y: nextY };
+            }
           }
-
-          if (!isBlocked && !isOccupied) {
-            return { ...enemy, x: nextX, y: nextY };
+        } else {
+          // プレイヤーから遠い場合は30%の確率でランダムに徘徊
+          if (Math.random() < 0.3) {
+            const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+            const [rx, ry] = dirs[Math.floor(Math.random() * dirs.length)];
+            let nextX = enemy.x + rx;
+            let nextY = enemy.y + ry;
+            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+            let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
+            if (!isBlocked && !isOccupied) {
+              return { ...enemy, x: nextX, y: nextY };
+            }
           }
         }
         return enemy;
@@ -2606,25 +2619,39 @@ function App() {
       const dy = player.y - enemy.y;
       const dist = Math.abs(dx) + Math.abs(dy);
 
-      if (dist > 1 && dist <= 5) {
+      if (dist === 1) return enemy;
+
+      if (dist <= 5) {
         const stepX = Math.sign(dx);
         const stepY = Math.sign(dy);
 
-        let nextX = enemy.x + stepX;
-        let nextY = enemy.y;
+        let axes = Math.random() > 0.5 
+          ? [{x: stepX, y: 0}, {x: 0, y: stepY}] 
+          : [{x: 0, y: stepY}, {x: stepX, y: 0}];
 
-        let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-        let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
+        for (let axis of axes) {
+          if (axis.x === 0 && axis.y === 0) continue;
+          let nextX = enemy.x + axis.x;
+          let nextY = enemy.y + axis.y;
 
-        if (isBlocked || isOccupied) {
-          nextX = enemy.x;
-          nextY = enemy.y + stepY;
-          isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-          isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
+          let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+          let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
+
+          if (!isBlocked && !isOccupied) {
+            return { ...enemy, x: nextX, y: nextY };
+          }
         }
-
-        if (!isBlocked && !isOccupied) {
-          return { ...enemy, x: nextX, y: nextY };
+      } else {
+        if (Math.random() < 0.3) {
+          const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+          const [rx, ry] = dirs[Math.floor(Math.random() * dirs.length)];
+          let nextX = enemy.x + rx;
+          let nextY = enemy.y + ry;
+          let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+          let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
+          if (!isBlocked && !isOccupied) {
+            return { ...enemy, x: nextX, y: nextY };
+          }
         }
       }
       return enemy;
