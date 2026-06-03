@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { checkAnswer } from '../utils/questions';
+import { generateQuizFeedback } from '../utils/gemini';
 import { recordAnswer } from '../utils/stats';
 import { playCorrectSound, playIncorrectSound } from '../utils/sound';
 import './QuizOverlay.css';
@@ -23,31 +24,56 @@ const CATEGORY_ICONS = {
 // =====================
 // 4択モード
 // =====================
-const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
+const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
   const [answered, setAnswered] = useState(null); // null | { selected, isCorrect }
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [aiFeedback, setAiFeedback] = useState(null); // null | { loading: true } | { tutorExplanation, loading: false }
+  const [canProceed, setCanProceed] = useState(false);
 
-  const handleClick = useCallback((choice) => {
+  useEffect(() => {
+    if (aiFeedback && !aiFeedback.loading) {
+      const timer = setTimeout(() => setCanProceed(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [aiFeedback]);
+
+  const handleClick = useCallback(async (choice) => {
     if (answered) return;
     const isCorrect = choice === questionObj.answer;
     setAnswered({ selected: choice, isCorrect });
     recordAnswer(questionObj.id, isCorrect);
     
-    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      setTimeout(() => onCorrect(), hasExplanation ? 2500 : 900);
     } else {
       playIncorrectSound();
-      setTimeout(() => onIncorrect(), hasExplanation ? 3500 : 1400);
     }
-  }, [answered, questionObj, onCorrect, onIncorrect]);
+
+    setAiFeedback({ loading: true });
+    setCanProceed(false);
+    const feedback = await generateQuizFeedback(
+      questionObj.question,
+      questionObj.answer,
+      choice,
+      isCorrect,
+      enemyName
+    );
+
+    if (feedback) {
+      setAiFeedback({ ...feedback, loading: false });
+    } else {
+      setAiFeedback({ loading: false, failed: true });
+    }
+  }, [answered, questionObj, enemyName]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (answered && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
-        if (answered.isCorrect) onCorrect(); else onIncorrect();
+        if (e.repeat) return; // 長押し（キーリピート）を防止
+        if (aiFeedback && !aiFeedback.loading && canProceed) {
+          if (answered.isCorrect) onCorrect(); else onIncorrect();
+        }
         return;
       }
       if (answered) return;
@@ -82,8 +108,7 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answered, selectedIndex, questionObj, handleClick]);
+  }, [answered, selectedIndex, questionObj, handleClick, aiFeedback, canProceed, onCorrect, onIncorrect]);
 
 
   const getButtonStyle = (choice, idx) => {
@@ -159,19 +184,35 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
               : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
             }
           </div>
-          {questionObj.explanation && (
-            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
-              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
-              {questionObj.explanation}
+
+          {aiFeedback && aiFeedback.loading && (
+            <div style={{ marginTop: '8px', padding: '8px', textAlign: 'center', color: '#e4e4e7', fontSize: '0.8rem' }}>
+              <span className="blinking-text">✨ Gemini AIが解説を考えています...</span>
             </div>
           )}
-          {questionObj.explanation && (
+
+          {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '0.75rem', color: '#bfdbfe' }}>
+                <strong style={{ color: '#60a5fa' }}>🧙‍♂️ AI先生:</strong> {aiFeedback.tutorExplanation}
+              </div>
+            </div>
+          )}
+
+          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && (
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
+              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
+              {questionObj.explanation ? questionObj.explanation : '（AIからの解説を受信できませんでした）'}
+            </div>
+          )}
+
+          {aiFeedback && !aiFeedback.loading && (
              <button
-               onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+               onClick={() => canProceed ? (answered.isCorrect ? onCorrect() : onIncorrect()) : null}
                className="quiz-btn submit-btn"
-               style={{ marginTop: '8px', width: '100%' }}
+               style={{ marginTop: '10px', width: '100%', padding: '10px', opacity: canProceed ? 1 : 0.5, cursor: canProceed ? 'pointer' : 'not-allowed' }}
              >
-               つぎへ (ENTER)
+               次へ進む (ENTER)
              </button>
           )}
         </>
@@ -183,23 +224,46 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 // =====================
 // 入力モード（カタカナ / 数字 両対応）
 // =====================
-const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
+const InputQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
   const [inputValue, setInputValue] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [answered, setAnswered] = useState(null); // null | { isCorrect }
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [canProceed, setCanProceed] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
   }, []);
 
+  useEffect(() => {
+    if (aiFeedback && !aiFeedback.loading) {
+      const timer = setTimeout(() => setCanProceed(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [aiFeedback]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (answered && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        if (e.repeat) return; // 長押し（キーリピート）を防止
+        if (aiFeedback && !aiFeedback.loading && canProceed) {
+          if (answered.isCorrect) onCorrect(); else onIncorrect();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [answered, aiFeedback, canProceed, onCorrect, onIncorrect]);
+
   const isMath = questionObj.category === '算数計算';
   const isKatakana = questionObj.category === '英語カタカナ';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (answered) {
-      if (answered.isCorrect) onCorrect(); else onIncorrect();
+      // 進行処理は上の handleKeyDown で行うため、フォーム送信は無視
       return;
     }
     if (!inputValue.trim()) return;
@@ -208,13 +272,26 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
     setAnswered({ isCorrect });
     recordAnswer(questionObj.id, isCorrect);
 
-    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      if (!hasExplanation) setTimeout(() => onCorrect(), 900);
     } else {
       playIncorrectSound();
-      if (!hasExplanation) setTimeout(() => onIncorrect(), 1400);
+    }
+
+    setAiFeedback({ loading: true });
+    setCanProceed(false);
+    const feedback = await generateQuizFeedback(
+      questionObj.question,
+      questionObj.answer,
+      inputValue,
+      isCorrect,
+      enemyName
+    );
+
+    if (feedback) {
+      setAiFeedback({ ...feedback, loading: false });
+    } else {
+      setAiFeedback({ loading: false, failed: true });
     }
   };
 
@@ -302,7 +379,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
         </div>
 
         <div className="quiz-buttons">
-          {!answered || !questionObj.explanation ? (
+          {!answered ? (
             <button
               type="submit"
               className="quiz-btn submit-btn"
@@ -323,21 +400,37 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
               : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
             }
           </div>
-          {questionObj.explanation && (
-            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f46', borderRadius: '6px', padding: '10px', marginTop: '8px', fontSize: '0.85rem', color: '#e4e4e7', lineHeight: '1.4' }} className="explanation-box">
-              <strong style={{ color: '#fbbf24' }}>💡 解説:</strong><br/>
-              {questionObj.explanation}
+
+          {aiFeedback && aiFeedback.loading && (
+            <div style={{ marginTop: '8px', padding: '8px', textAlign: 'center', color: '#e4e4e7', fontSize: '0.8rem' }}>
+              <span className="blinking-text">✨ Gemini AIが解説を考えています...</span>
             </div>
           )}
-          {questionObj.explanation && (
-            <button 
-              type="button"
-              className="quiz-btn submit-btn" 
-              style={{ width: '100%', marginTop: '10px', padding: '10px' }} 
-              onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
-            >
-              次へ進む (Enter)
-            </button>
+
+          {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '0.75rem', color: '#bfdbfe' }}>
+                <strong style={{ color: '#60a5fa' }}>🧙‍♂️ AI先生:</strong> {aiFeedback.tutorExplanation}
+              </div>
+            </div>
+          )}
+
+          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && (
+            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f46', borderRadius: '6px', padding: '10px', marginTop: '8px', fontSize: '0.85rem', color: '#e4e4e7', lineHeight: '1.4' }} className="explanation-box">
+              <strong style={{ color: '#fbbf24' }}>💡 解説:</strong><br/>
+              {questionObj.explanation ? questionObj.explanation : '（AIからの解説を受信できませんでした）'}
+            </div>
+          )}
+
+          {aiFeedback && !aiFeedback.loading && (
+             <button 
+               type="button"
+               className="quiz-btn submit-btn" 
+               style={{ width: '100%', marginTop: '10px', padding: '10px', opacity: canProceed ? 1 : 0.5, cursor: canProceed ? 'pointer' : 'not-allowed' }} 
+               onClick={() => canProceed ? (answered.isCorrect ? onCorrect() : onIncorrect()) : null}
+             >
+               次へ進む (Enter)
+             </button>
           )}
         </div>
       )}
@@ -348,7 +441,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 // =====================
 // メインコンポーネント
 // =====================
-const QuizOverlay = ({ questionObj, onCorrect, onIncorrect }) => {
+const QuizOverlay = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
   if (!questionObj) return null;
 
   if (questionObj.type === 'choice') {
@@ -357,6 +450,7 @@ const QuizOverlay = ({ questionObj, onCorrect, onIncorrect }) => {
         questionObj={questionObj}
         onCorrect={onCorrect}
         onIncorrect={onIncorrect}
+        enemyName={enemyName}
       />
     );
   }
@@ -366,6 +460,7 @@ const QuizOverlay = ({ questionObj, onCorrect, onIncorrect }) => {
       questionObj={questionObj}
       onCorrect={onCorrect}
       onIncorrect={onIncorrect}
+      enemyName={enemyName}
     />
   );
 };

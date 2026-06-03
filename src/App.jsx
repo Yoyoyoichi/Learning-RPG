@@ -4,7 +4,7 @@ import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
 import { getRandomQuestion, setDefaultQuestions, getCustomQuestions, QUESTIONS_DB } from './utils/questions';
-import { generateFloorStory } from './utils/gemini';
+import { generateFloorStory, generateGameStateComment, generateQuizHint } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
 import { syncAllToCloud, syncAllFromCloud } from './utils/sync';
@@ -334,11 +334,7 @@ function App() {
 
   // Card deck-building RPG States
   const [battle, setBattle] = useState(null);
-  const [campsite, setCampsite] = useState(
-    window.location.search.includes('test=camp') 
-      ? { nextFloorNum: 2, showSmithDeck: true } 
-      : null
-  );
+  const [campsite, setCampsite] = useState(null);
   const [cardReward, setCardReward] = useState(null);
   const [shop, setShop] = useState(null);
 
@@ -355,6 +351,15 @@ function App() {
   const mapMessageTimerRef = useRef(null);
   const lastMoveTimeRef = useRef(0);
   const [mapMessage, setMapMessage] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
+
+  const saveApiKey = () => {
+    localStorage.setItem('GEMINI_API_KEY', apiKeyInput);
+    setShowSettings(false);
+    addLog('設定を保存しました。', 'system');
+  };
+  const [aiComment, setAiComment] = useState(null);
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
@@ -1189,7 +1194,7 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
-                  const isFocused = idx === campsiteCardFocusIndex;
+                  const isFocused = cardFocused === idx;
                   return (
                     <button
                       key={card.id || idx}
@@ -1197,8 +1202,8 @@ function App() {
                       onClick={() => handleCampsiteUpgrade(card)}
                       style={{
                         padding: '4px',
-                        background: isFocused ? '#fef08a' : '#ffffff',
-                        border: isFocused ? `3px solid #f59e0b` : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
+                        background: '#ffffff',
+                        border: isFocused ? '3px solid #fbbf24' : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
                         color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
@@ -1207,9 +1212,10 @@ function App() {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1px',
-                        boxShadow: isFocused ? `0 0 16px #fbbf24, 0 0 0 4px #f59e0b` : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
+                        boxShadow: isFocused ? '0 0 12px #f59e0b, 0 0 0 2px #fbbf24' : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
                         transform: isFocused ? 'scale(1.05)' : 'scale(1)',
-                        transition: 'transform 0.15s, box-shadow 0.15s'
+                        transition: 'all 0.15s',
+                        outline: 'none'
                       }}
                     >
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
@@ -1664,6 +1670,7 @@ function App() {
             questionObj={activeQuiz.questionObj}
             onCorrect={() => resolveCombatTurn(true)}
             onIncorrect={() => resolveCombatTurn(false)}
+            enemyName={battle ? battle.enemy.name : '謎の敵'}
           />
         </div>
       );
@@ -2092,11 +2099,7 @@ function App() {
     setIsStoryLoading(true);
     setFloorStory(null);
     setIsStoryLoading(false);
-    chattersPoolRef.current = [
-      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-    ];
+    chattersPoolRef.current = [];
     chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(1);
@@ -2130,11 +2133,7 @@ function App() {
     setIsStoryLoading(true);
     setFloorStory(null);
     setIsStoryLoading(false);
-    chattersPoolRef.current = [
-      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-    ];
+    chattersPoolRef.current = [];
     chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(nextFloorNum);
@@ -2308,6 +2307,41 @@ function App() {
   };
 
   // Turn logic execution (Synchronous State Resolution)
+
+  const triggerAIComment = async () => {
+    if (aiComment) return;
+
+    setAiComment({ loading: true });
+
+    let result;
+    if (activeQuiz && activeQuiz.questionObj) {
+      result = await generateQuizHint(activeQuiz.questionObj);
+    } else {
+      const gameState = {
+        hp: player.hp,
+        maxHp: player.maxHp,
+        floor: player.floor,
+        inBattle: !!battle,
+        enemyName: battle ? battle.enemy.name : null,
+        enemyHp: battle ? battle.enemy.hp : null
+      };
+      result = await generateGameStateComment(gameState);
+    }
+    
+    
+    if (result && result.comment) {
+      setAiComment({ text: result.comment, loading: false });
+      addLog(`🧙‍♂️ 先生: ${result.comment}`, 'system');
+      
+      if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
+      mapMessageTimerRef.current = setTimeout(() => {
+        setAiComment(null);
+      }, 5000);
+    } else {
+      setAiComment(null);
+    }
+  };
+
   const handleMove = (dx, dy) => {
     if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
 
@@ -2590,6 +2624,18 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ignore if typing in an input field (e.g. Spelling Quiz)
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        return;
+      }
+
+      // Global AI Comment shortcut
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        triggerAIComment();
+        return;
+      }
+
       if (gameOver) {
         if (e.key === 'Enter') startNewGame();
         return;
@@ -2601,7 +2647,7 @@ function App() {
       if (activeQuiz) return;
       
       if (battle) {
-        if (battle.battleLog.length > 0) {
+        if (battle.battleLog && battle.battleLog.length > 0) {
           if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
             e.preventDefault();
             setBattle(prev => ({ ...prev, battleLog: [] }));
@@ -2613,10 +2659,10 @@ function App() {
         let currentIdx = Math.min(battleFocusIndex, itemCount - 1);
         let newIdx = currentIdx;
 
-        if (['ArrowLeft', 'ArrowUp', 'a', 'w', 'A', 'W'].includes(e.key)) {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
           e.preventDefault();
           newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
-        } else if (['ArrowRight', 'ArrowDown', 'd', 's', 'D', 'S'].includes(e.key)) {
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
           e.preventDefault();
           newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
         } else if (e.key === 'Enter' || e.key === ' ') {
@@ -2702,7 +2748,6 @@ function App() {
             e.preventDefault();
             if (currentIdx === N) newIdx = N > 0 ? 0 : N;
             else if (currentIdx + 2 < N) newIdx = currentIdx + 2;
-            else newIdx = N;
           } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             if (currentIdx === player.deck.length) {
@@ -2877,6 +2922,7 @@ function App() {
         case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
         case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
         case ' ': e.preventDefault(); handleWait(); moved = true; break;
+        
         default: break;
       }
 
@@ -2887,7 +2933,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex, aiComment]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
@@ -3059,7 +3105,110 @@ function App() {
         | Loaded: {QUESTIONS_DB.length}
         | Exps: {QUESTIONS_DB.filter(q => q.explanation).length}
       </div>
+      {/* Global AI Comment Overlay */}
+      {aiComment && !aiComment.loading && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'rgba(59, 130, 246, 0.95)',
+          border: '2px solid #2563eb',
+          color: '#ffffff',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          maxWidth: '280px',
+          fontSize: '0.85rem',
+          lineHeight: '1.4',
+          zIndex: 1000,
+          pointerEvents: 'none'
+        }}>
+          <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生</strong>
+          {aiComment.text}
+        </div>
+      )}
 
+      {/* Settings Button */}
+      {!gameOver && !gameVictory && (
+        <button
+          onClick={() => setShowSettings(true)}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            background: '#4b5563',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            fontSize: '1.2rem',
+            cursor: 'pointer',
+            zIndex: 900
+          }}
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
+        }}>
+          <div style={{
+            background: '#1f2937', padding: '24px', borderRadius: '12px',
+            color: 'white', maxWidth: '400px', width: '90%'
+          }}>
+            <h2 style={{ marginTop: 0 }}>⚙️ 設定</h2>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px' }}>Gemini APIキー (任意)</label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AI機能を使う場合に入力"
+                style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              />
+              <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '4px', lineHeight: '1.4' }}>
+                ※公開サイト上でAI先生を機能させるにはAPIキーの入力が必要です。入力内容はブラウザの内部にのみ保存され、外部に送信されることはありません。
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={() => setShowSettings(false)} style={{ padding: '8px 16px', background: '#374151', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={saveApiKey} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual AI Comment Trigger Button */}
+      {!gameOver && !gameVictory && (
+        <button
+          onClick={triggerAIComment}
+          disabled={aiComment && aiComment.loading}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#3b82f6',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '10px 16px',
+            fontSize: '0.85rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            zIndex: 900,
+            transition: 'background 0.2s',
+            opacity: (aiComment && aiComment.loading) ? 0.6 : 1
+          }}
+        >
+          {aiComment && aiComment.loading ? '⏳ 考え中...' : '💡 先生に相談'}
+        </button>
+      )}
     </div>
   );
 }
