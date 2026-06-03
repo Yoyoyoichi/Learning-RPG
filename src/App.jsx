@@ -723,7 +723,9 @@ function App() {
     currentPlayer.xp += xpReward;
     currentPlayer.gold += goldReward;
 
+    let isLevelUp = false;
     if (currentPlayer.xp >= currentPlayer.xpNeeded) {
+      isLevelUp = true;
       currentPlayer.level += 1;
       currentPlayer.xp -= currentPlayer.xpNeeded;
       currentPlayer.xpNeeded = Math.round(currentPlayer.xpNeeded * 1.5);
@@ -753,11 +755,15 @@ function App() {
       addLog("レリック「きゅうけつきのキバ」の効果でHPが3回復した！", 'system');
     }
 
-    setCardReward({
-      choices: getRandomRewardCards(currentPlayer.floor),
-      gold: actualGold,
-      xp: xpReward
-    });
+    if (isLevelUp) {
+      setCardReward({
+        choices: getRandomRewardCards(currentPlayer.floor),
+        gold: actualGold,
+        xp: xpReward
+      });
+    } else {
+      addLog(`戦利品: ${xpReward} XP, ${actualGold} G`, 'system');
+    }
   };
 
   const resolveEnemyTurn = () => {
