@@ -277,7 +277,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.78rem;
+  font-size: 1.1rem;
   padding-right: 0.5rem;
 }
 

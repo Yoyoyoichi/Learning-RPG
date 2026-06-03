@@ -1,13 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // VITE_GEMINI_API_KEY を .env.local から取得
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 // APIキーが設定されている場合のみインスタンス化
-const genAI = apiKey && apiKey !== "ここにAPIキーを貼り付けてください" 
-  ? new GoogleGenerativeAI(apiKey) 
-  : null;
-
+// const genAI = apiKey && apiKey !== "ここにAPIキーを貼り付けてください" 
+//   ? new GoogleGenerativeAI(apiKey) 
+//   : null;
+const genAI = null;
 export const generateFloorStory = async (floorNumber) => {
   if (!genAI) {
     return {
