@@ -239,7 +239,7 @@ const INITIAL_PLAYER = {
   def: 0,
   level: 1,
   xp: 0,
-  xpNeeded: 20,
+  xpNeeded: 50,
   gold: 0,
   floor: 1,
   swordEquipped: false,
@@ -728,7 +728,7 @@ function App() {
       isLevelUp = true;
       currentPlayer.level += 1;
       currentPlayer.xp -= currentPlayer.xpNeeded;
-      currentPlayer.xpNeeded = Math.round(currentPlayer.xpNeeded * 1.5);
+      currentPlayer.xpNeeded = Math.round(currentPlayer.xpNeeded * 1.8);
       currentPlayer.maxHp += 8;
       currentPlayer.hp = currentPlayer.maxHp;
       currentPlayer.atk += 2;
