@@ -3128,8 +3128,63 @@ function App() {
         </div>
       )}
 
+      {/* Settings Button */}
+      {!gameOver && !gameVictory && (
+        <button
+          onClick={() => setShowSettings(true)}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            background: '#4b5563',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            fontSize: '1.2rem',
+            cursor: 'pointer',
+            zIndex: 900
+          }}
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
+        }}>
+          <div style={{
+            background: '#1f2937', padding: '24px', borderRadius: '12px',
+            color: 'white', maxWidth: '400px', width: '90%'
+          }}>
+            <h2 style={{ marginTop: 0 }}>⚙️ 設定</h2>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px' }}>Gemini APIキー (任意)</label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AI機能を使う場合に入力"
+                style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              />
+              <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '4px', lineHeight: '1.4' }}>
+                ※公開サイト上でAI先生を機能させるにはAPIキーの入力が必要です。入力内容はブラウザの内部にのみ保存され、外部に送信されることはありません。
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={() => setShowSettings(false)} style={{ padding: '8px 16px', background: '#374151', color: 'white', border: '1px solid #4b5563', borderRadius: '4px', cursor: 'pointer' }}>キャンセル</button>
+              <button onClick={saveApiKey} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Manual AI Comment Trigger Button */}
-      {!activeQuiz && !gameOver && !gameVictory && (
+      {!gameOver && !gameVictory && (
         <button
           onClick={triggerAIComment}
           disabled={aiComment && aiComment.loading}
