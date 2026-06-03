@@ -229,6 +229,32 @@ const generateDungeon = (floor) => {
   return { grid, rooms, enemies, items, startPos };
 };
 
+const WEAPON_TIERS = [
+  { name: 'ひのきの棒', atk: 1 },
+  { name: '青銅の剣', atk: 2 },
+  { name: '鉄の剣', atk: 3 },
+  { name: '鋼の剣', atk: 4 },
+  { name: '銀の剣', atk: 5 },
+  { name: '魔法の剣', atk: 7 },
+  { name: 'ミスリルソード', atk: 9 },
+  { name: 'ドラゴンキラー', atk: 12 },
+  { name: '勇者の剣', atk: 15 },
+  { name: 'エクスカリバー', atk: 20 }
+];
+
+const ARMOR_TIERS = [
+  { name: '皮の服', def: 1 },
+  { name: '青銅の盾', def: 2 },
+  { name: '鉄の盾', def: 3 },
+  { name: '鋼の盾', def: 4 },
+  { name: '銀の盾', def: 5 },
+  { name: '魔法の盾', def: 6 },
+  { name: 'ミスリルシールド', def: 8 },
+  { name: 'ドラゴンシールド', def: 10 },
+  { name: '勇者の盾', def: 12 },
+  { name: 'イージスの盾', def: 15 }
+];
+
 // Initial Player Stats
 const INITIAL_PLAYER = {
   x: 0,
@@ -1283,11 +1309,19 @@ function App() {
       setPlayer(prev => {
         const np = { ...prev, gold: prev.gold - weapon.cost };
         if (weapon.key === 'sword') {
-          np.swordLevel = (np.swordLevel || (np.swordEquipped ? 2 : 0)) + 1;
-          np.swordEquipped = true;
+          const curLv = np.swordLevel || 0;
+          if (curLv < WEAPON_TIERS.length) {
+            np.swordLevel = curLv + 1;
+            np.swordEquipped = true;
+            np.atk += WEAPON_TIERS[curLv].atk;
+          }
         } else {
-          np.shieldLevel = (np.shieldLevel || (np.shieldEquipped ? 2 : 0)) + 1;
-          np.shieldEquipped = true;
+          const curLv = np.shieldLevel || 0;
+          if (curLv < ARMOR_TIERS.length) {
+            np.shieldLevel = curLv + 1;
+            np.shieldEquipped = true;
+            np.def += ARMOR_TIERS[curLv].def;
+          }
         }
         return np;
       });
@@ -2442,15 +2476,25 @@ function App() {
         } else if (item.subType === 'chest') {
           const r = Math.random();
           if (r < 0.25) {
-            nextPlayer.swordEquipped = true;
-            nextPlayer.swordLevel = (nextPlayer.swordLevel || 0) + 1;
-            nextPlayer.atk += 2;
-            addLog(`${item.name}を開けた！ 「業物の剣」が入っていた！ (攻撃力+2)`, 'item-pickup');
+            const curLv = nextPlayer.swordLevel || 0;
+            if (curLv < WEAPON_TIERS.length) {
+              nextPlayer.swordLevel = curLv + 1;
+              nextPlayer.swordEquipped = true;
+              nextPlayer.atk += WEAPON_TIERS[curLv].atk;
+              addLog(`${item.name}を開けた！ 「${WEAPON_TIERS[curLv].name}」が入っていた！ (攻撃力+${WEAPON_TIERS[curLv].atk})`, 'item-pickup');
+            } else {
+              addLog(`${item.name}を開けたが、今の装備の方が強そうだ。`, 'item-pickup');
+            }
           } else if (r < 0.50) {
-            nextPlayer.shieldEquipped = true;
-            nextPlayer.shieldLevel = (nextPlayer.shieldLevel || 0) + 1;
-            nextPlayer.def += 1;
-            addLog(`${item.name}を開けた！ 「頑丈な盾」が入っていた！ (防御力+1)`, 'item-pickup');
+            const curLv = nextPlayer.shieldLevel || 0;
+            if (curLv < ARMOR_TIERS.length) {
+              nextPlayer.shieldLevel = curLv + 1;
+              nextPlayer.shieldEquipped = true;
+              nextPlayer.def += ARMOR_TIERS[curLv].def;
+              addLog(`${item.name}を開けた！ 「${ARMOR_TIERS[curLv].name}」が入っていた！ (防御力+${ARMOR_TIERS[curLv].def})`, 'item-pickup');
+            } else {
+              addLog(`${item.name}を開けたが、今の装備の方が強そうだ。`, 'item-pickup');
+            }
           } else if (r < 0.75) {
             setCardReward({ choices: getRandomRewardCards(nextPlayer.floor), gold: 0, xp: 0 });
             addLog(`${item.name}を開けた！ 未知のカードが眠っていた！`, 'item-pickup');
@@ -2486,15 +2530,25 @@ function App() {
           });
           addLog('商人に出会った。', 'system');
         } else if (item.subType === 'sword') {
-          const curLv = nextPlayer.swordLevel || (nextPlayer.swordEquipped ? 2 : 0);
-          nextPlayer.swordLevel = curLv + 1;
-          nextPlayer.swordEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(剣Lv.${curLv+1} : 筋力+${curLv+1})`, 'item-pickup');
+          const curLv = nextPlayer.swordLevel || 0;
+          if (curLv < WEAPON_TIERS.length) {
+            nextPlayer.swordLevel = curLv + 1;
+            nextPlayer.swordEquipped = true;
+            nextPlayer.atk += WEAPON_TIERS[curLv].atk;
+            addLog(`武器「${WEAPON_TIERS[curLv].name}」を手に入れた！ (攻撃力+${WEAPON_TIERS[curLv].atk})`, 'item-pickup');
+          } else {
+            addLog(`武器を見つけたが、今の装備の方が強そうだ。`, 'item-pickup');
+          }
         } else if (item.subType === 'shield') {
-          const curLv = nextPlayer.shieldLevel || (nextPlayer.shieldEquipped ? 2 : 0);
-          nextPlayer.shieldLevel = curLv + 1;
-          nextPlayer.shieldEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(盾Lv.${curLv+1} : ブロック+${(curLv+1)*2})`, 'item-pickup');
+          const curLv = nextPlayer.shieldLevel || 0;
+          if (curLv < ARMOR_TIERS.length) {
+            nextPlayer.shieldLevel = curLv + 1;
+            nextPlayer.shieldEquipped = true;
+            nextPlayer.def += ARMOR_TIERS[curLv].def;
+            addLog(`防具「${ARMOR_TIERS[curLv].name}」を手に入れた！ (防御力+${ARMOR_TIERS[curLv].def})`, 'item-pickup');
+          } else {
+            addLog(`防具を見つけたが、今の装備の方が強そうだ。`, 'item-pickup');
+          }
         } else if (item.subType === 'energy_crystal') {
           nextPlayer.maxEnergy = (nextPlayer.maxEnergy || 3) + 1;
           addLog(`「${item.name}」を拾った！さいだいエネルギーが 1 ふえた！`, 'level-up');
