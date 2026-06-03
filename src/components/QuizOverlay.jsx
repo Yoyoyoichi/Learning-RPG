@@ -203,7 +203,7 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
             </div>
           )}
 
-          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && (
+          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && !answered.isCorrect && (
             <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
               <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
               {questionObj.explanation ? questionObj.explanation : (answered.isCorrect ? 'よくできました！' : '（AIからの解説を受信できませんでした）')}
@@ -423,7 +423,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
             </div>
           )}
 
-          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && (
+          {aiFeedback && !aiFeedback.loading && aiFeedback.failed && !answered.isCorrect && (
             <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f46', borderRadius: '6px', padding: '10px', marginTop: '8px', fontSize: '0.85rem', color: '#e4e4e7', lineHeight: '1.4' }} className="explanation-box">
               <strong style={{ color: '#fbbf24' }}>💡 解説:</strong><br/>
               {questionObj.explanation ? questionObj.explanation : (answered.isCorrect ? 'よくできました！' : '（AIからの解説を受信できませんでした）')}
