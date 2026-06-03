@@ -351,6 +351,14 @@ function App() {
   const mapMessageTimerRef = useRef(null);
   const lastMoveTimeRef = useRef(0);
   const [mapMessage, setMapMessage] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
+
+  const saveApiKey = () => {
+    localStorage.setItem('GEMINI_API_KEY', apiKeyInput);
+    setShowSettings(false);
+    addLog('設定を保存しました。', 'system');
+  };
   const [aiComment, setAiComment] = useState(null);
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");

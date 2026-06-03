@@ -1,14 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// VITE_GEMINI_API_KEY を .env.local から取得
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-// APIキーが設定されている場合のみインスタンス化
-const genAI = apiKey && apiKey !== "ここにAPIキーを貼り付けてください" 
-  ? new GoogleGenerativeAI(apiKey) 
-  : null;
+const getGenAI = () => {
+  const storedKey = localStorage.getItem('GEMINI_API_KEY');
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = storedKey || envKey;
+  
+  if (apiKey && apiKey !== "ここにAPIキーを貼り付けてください") {
+    return new GoogleGenerativeAI(apiKey);
+  }
+  return null;
+};
 
 export const generateFloorStory = async (floorNumber) => {
+  const genAI = getGenAI();
   if (!genAI) {
     return {
       story: `（Gemini APIキーが設定されていないため、ストーリーは生成されませんでした。第${floorNumber}階層に到達しました。）`,
@@ -69,6 +73,7 @@ export const generateFloorStory = async (floorNumber) => {
 };
 
 export const generateQuizFeedback = async (question, answer, userAnswer, isCorrect, enemyName) => {
+  const genAI = getGenAI();
   if (!genAI) {
     return { tutorExplanation: 'APIキーが設定されていません' };
   }
@@ -119,6 +124,7 @@ export const generateQuizFeedback = async (question, answer, userAnswer, isCorre
 };
 
 export const generateGameStateComment = async (gameState) => {
+  const genAI = getGenAI();
   if (!genAI) return null;
 
   try {
@@ -166,6 +172,7 @@ ${gameState.recentQuestion ? `直近のクイズ問題: ${gameState.recentQuesti
 };
 
 export const generateQuizHint = async (questionObj) => {
+  const genAI = getGenAI();
   if (!genAI) return null;
 
   try {
