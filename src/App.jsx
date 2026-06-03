@@ -235,8 +235,8 @@ const INITIAL_PLAYER = {
   y: 0,
   hp: 80,
   maxHp: 80,
-  atk: 7,
-  def: 2,
+  atk: 0,
+  def: 0,
   level: 1,
   xp: 0,
   xpNeeded: 20,
@@ -784,7 +784,8 @@ function App() {
           if (nextBattle.playerStatus.vulnerable > 0) {
              baseDmg = Math.floor(baseDmg * 1.5);
           }
-          let currentDmg = baseDmg;
+          // プレイヤーの防御力(def)でダメージを軽減
+          let currentDmg = Math.max(0, baseDmg - nextPlayer.def);
           let playerBlock = nextBattle.playerBlock;
           let finalDmg = currentDmg;
           
@@ -2202,7 +2203,8 @@ function App() {
 
         const stateHelpers = {
           dealDamage: (dmg, target, options) => {
-            let baseDmg = dmg === 'block' ? nextBattle.playerBlock : dmg;
+            // プレイヤーのレベル由来の攻撃力(atk)を基礎ダメージに加算
+            let baseDmg = dmg === 'block' ? nextBattle.playerBlock : (dmg + nextPlayer.atk);
             
             // 筋力の適用
             const strMulti = options?.strengthMultiplier || 1;
