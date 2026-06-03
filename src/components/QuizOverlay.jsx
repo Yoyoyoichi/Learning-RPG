@@ -193,8 +193,8 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
 
           {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '2px solid #3b82f6', fontSize: '1.25rem', color: '#ffffff', lineHeight: '1.6' }}>
-                <strong style={{ color: '#60a5fa', fontSize: '1.3rem', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生:</strong> 
+              <div style={{ padding: '10px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '1.05rem', color: '#ffffff', lineHeight: '1.5' }}>
+                <strong style={{ color: '#60a5fa', fontSize: '1.1rem', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生:</strong> 
                 {aiFeedback.tutorExplanation}
               </div>
             </div>
@@ -410,8 +410,8 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
 
           {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '2px solid #3b82f6', fontSize: '1.25rem', color: '#ffffff', lineHeight: '1.6' }}>
-                <strong style={{ color: '#60a5fa', fontSize: '1.3rem', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生:</strong> 
+              <div style={{ padding: '10px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '1.05rem', color: '#ffffff', lineHeight: '1.5' }}>
+                <strong style={{ color: '#60a5fa', fontSize: '1.1rem', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生:</strong> 
                 {aiFeedback.tutorExplanation}
               </div>
             </div>
