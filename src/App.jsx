@@ -2564,6 +2564,9 @@ function App() {
         if (dist === 1) return enemy;
 
         if (dist <= 5) {
+          // 25%の確率で追跡をサボる（プレイヤーが逃げ切れるようにするため）
+          if (Math.random() < 0.25) return enemy;
+
           const stepX = Math.sign(dx);
           const stepY = Math.sign(dy);
 
@@ -2622,6 +2625,9 @@ function App() {
       if (dist === 1) return enemy;
 
       if (dist <= 5) {
+        // 25%の確率で追跡をサボる（プレイヤーが逃げ切れるようにするため）
+        if (Math.random() < 0.25) return enemy;
+
         const stepX = Math.sign(dx);
         const stepY = Math.sign(dy);
 
