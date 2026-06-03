@@ -1,0 +1,148 @@
+  const renderShopContent = () => {
+    if (!shop) return null;
+
+    const handleBuyCard = (card, price) => {
+      if (player.gold >= price) {
+        setPlayer(prev => ({ ...prev, gold: prev.gold - price, deck: [...prev.deck, card] }));
+        setShop(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== card.id) }));
+        addLog(`🪙 ${price}Gで「${card.name}」を購入した！`, 'system');
+      } else {
+        addLog("ゴールドが足りない！", 'system');
+      }
+    };
+
+    const handleBuyRelic = (relic) => {
+      if (!relic) return;
+      if (player.gold >= relic.price) {
+        setPlayer(prev => ({ 
+          ...prev, 
+          gold: prev.gold - relic.price, 
+          relics: [...(prev.relics || []), relic] 
+        }));
+        setShop(prev => ({ ...prev, relic: null }));
+        addLog(`🪙 ${relic.price}Gでレリック「${relic.name}」を購入した！`, 'system');
+      } else {
+        addLog("ゴールドが足りない！", 'system');
+      }
+    };
+
+    const handleBuyPotion = () => {
+      const price = 30;
+      if (player.gold >= price) {
+        setPlayer(prev => ({ ...prev, gold: prev.gold - price, hp: Math.min(prev.maxHp, prev.hp + 20) }));
+        addLog(`🪙 ${price}Gでポーションを購入し、HPを20回復した！`, 'system');
+      } else {
+        addLog("ゴールドが足りない！", 'system');
+      }
+    };
+
+    const handleRemoveCard = (index) => {
+      if (player.gold >= shop.removeCost) {
+        const removedCard = player.deck[index];
+        setPlayer(prev => {
+          const newDeck = [...prev.deck];
+          newDeck.splice(index, 1);
+          return {
+            ...prev,
+            gold: prev.gold - shop.removeCost,
+            deck: newDeck,
+            removedCount: (prev.removedCount || 0) + 1
+          };
+        });
+        setShop(prev => ({ ...prev, removeCost: prev.removeCost + 25 }));
+        addLog(`🪙 ${shop.removeCost}Gで「${removedCard.name}」を削除した！`, 'system');
+      } else {
+        addLog("ゴールドが足りない！", 'system');
+      }
+    };
+
+    return (
+      <div className="shop-screen" style={{ width: '100%', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', boxSizing: 'border-box', background: '#0a0a0c', border: '1px solid #eab308', borderRadius: '8px', color: '#f3f4f6', gap: '12px' }}>
+        <h2 style={{ color: '#eab308', margin: 0, fontSize: '1.2rem' }}>💰 商人</h2>
+        <div style={{ color: '#fbbf24', fontSize: '0.9rem', fontWeight: 'bold' }}>所持ゴールド: {player.gold} G</div>
+
+        {/* カード購入 */}
+        <div style={{ width: '100%' }}>
+          <h3 style={{ fontSize: '0.8rem', color: '#9ca3af', borderBottom: '1px solid #3f3f46', paddingBottom: '4px' }}>カード購入</h3>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 0' }}>
+            {shop.cards && shop.cards.map((card, idx) => {
+              const price = card.rarity === 'rare' ? 80 : card.rarity === 'uncommon' ? 50 : 30;
+              const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
+              return (
+                <button
+                  key={card.id || idx}
+                  onClick={() => handleBuyCard(card, price)}
+                  style={{
+                    flex: '0 0 100px',
+                    height: '130px',
+                    border: `1px solid ${borderCol}`,
+                    borderRadius: '4px',
+                    background: '#1c1917',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '4px',
+                    gap: '4px'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#fef08a' }}>{card.name}</div>
+                  <div style={{ fontSize: '0.58rem', lineHeight: '1.2', flex: 1 }}>{card.desc}</div>
+                  <div style={{ color: '#fbbf24', fontWeight: 'bold' }}>{price} G</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* レリック・ポーション */}
+        <div style={{ width: '100%' }}>
+          <h3 style={{ fontSize: '0.8rem', color: '#9ca3af', borderBottom: '1px solid #3f3f46', paddingBottom: '4px' }}>アイテム購入</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {shop.relic && (
+              <button onClick={() => handleBuyRelic(shop.relic)} style={{ flex: 1, padding: '8px', background: '#1c1917', border: '1px solid #f97316', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}>
+                <div style={{ color: '#f97316', fontWeight: 'bold' }}>{shop.relic.name}</div>
+                <div style={{ fontSize: '0.65rem' }}>{shop.relic.desc}</div>
+                <div style={{ color: '#fbbf24', marginTop: '4px', fontWeight: 'bold' }}>{shop.relic.price} G</div>
+              </button>
+            )}
+            <button onClick={handleBuyPotion} style={{ flex: 1, padding: '8px', background: '#1c1917', border: '1px solid #ec4899', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}>
+              <div style={{ color: '#ec4899', fontWeight: 'bold' }}>ポーション</div>
+              <div style={{ fontSize: '0.65rem' }}>HPを20回復する</div>
+              <div style={{ color: '#fbbf24', marginTop: '4px', fontWeight: 'bold' }}>30 G</div>
+            </button>
+          </div>
+        </div>
+
+        {/* カード削除 */}
+        <div style={{ width: '100%' }}>
+          <h3 style={{ fontSize: '0.8rem', color: '#9ca3af', borderBottom: '1px solid #3f3f46', paddingBottom: '4px' }}>デッキ圧縮 (カード削除) - {shop.removeCost} G</h3>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 0' }}>
+            {player.deck.map((card, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleRemoveCard(idx)}
+                style={{
+                  flex: '0 0 80px',
+                  padding: '4px',
+                  background: '#1c1917',
+                  border: '1px solid #44403c',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '0.7rem'
+                }}
+              >
+                {card.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={() => setShop(null)} style={{ marginTop: 'auto', padding: '8px 24px', background: '#3f3f46', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
+          店を出る
+        </button>
+      </div>
+    );
+  };

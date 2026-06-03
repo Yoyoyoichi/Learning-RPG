@@ -622,7 +622,8 @@ export const getCustomQuestions = () => {
   try {
     const data = localStorage.getItem('learning_rpg_custom_questions');
     return data ? JSON.parse(data) : [];
-  } catch (e) {
+  } catch (err) {
+    console.error(err);
     return [];
   }
 };
@@ -632,6 +633,7 @@ export const getCustomQuestions = () => {
 // reviewIds: まちがえた問題のID一覧（30%の確率で再出題）
 // =============================
 export const getRandomQuestion = (floor = 1, reviewIds = []) => {
+  console.debug(floor);
   let selected;
   const customQuestions = getCustomQuestions();
   const allQuestions = customQuestions.length > 0 ? customQuestions : QUESTIONS_DB;
@@ -651,7 +653,8 @@ export const getRandomQuestion = (floor = 1, reviewIds = []) => {
 
   // 4択の場合は選択肢をシャッフル
   if (selected.type === 'choice') {
-    const shuffledChoices = [...selected.choices].sort(() => Math.random() - 0.5);
+    const choicesToUse = selected.choices && selected.choices.length > 0 ? selected.choices : [selected.answer];
+    const shuffledChoices = [...choicesToUse].sort(() => Math.random() - 0.5);
     return { ...selected, shuffledChoices };
   }
 

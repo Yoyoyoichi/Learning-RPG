@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { checkAnswer } from '../utils/questions';
 import { recordAnswer } from '../utils/stats';
 import { playCorrectSound, playIncorrectSound } from '../utils/sound';
@@ -25,23 +25,68 @@ const CATEGORY_ICONS = {
 // =====================
 const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
   const [answered, setAnswered] = useState(null); // null | { selected, isCorrect }
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const handleClick = (choice) => {
+  const handleClick = useCallback((choice) => {
     if (answered) return;
     const isCorrect = choice === questionObj.answer;
     setAnswered({ selected: choice, isCorrect });
     recordAnswer(questionObj.id, isCorrect);
     
+    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      setTimeout(() => onCorrect(), 900);
+      setTimeout(() => onCorrect(), hasExplanation ? 2500 : 900);
     } else {
       playIncorrectSound();
-      setTimeout(() => onIncorrect(), 1400);
+      setTimeout(() => onIncorrect(), hasExplanation ? 3500 : 1400);
     }
-  };
+  }, [answered, questionObj, onCorrect, onIncorrect]);
 
-  const getButtonStyle = (choice) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (answered && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        if (answered.isCorrect) onCorrect(); else onIncorrect();
+        return;
+      }
+      if (answered) return;
+      const count = questionObj.shuffledChoices.length;
+      let newIdx = selectedIndex;
+
+      if (['ArrowUp', 'w', 'W'].includes(e.key)) {
+        e.preventDefault();
+        newIdx = selectedIndex - 2 >= 0 ? selectedIndex - 2 : selectedIndex;
+      } else if (['ArrowDown', 's', 'S'].includes(e.key)) {
+        e.preventDefault();
+        newIdx = selectedIndex + 2 < count ? selectedIndex + 2 : selectedIndex;
+      } else if (['ArrowLeft', 'a', 'A'].includes(e.key)) {
+        e.preventDefault();
+        newIdx = selectedIndex % 2 === 1 ? selectedIndex - 1 : selectedIndex;
+      } else if (['ArrowRight', 'd', 'D'].includes(e.key)) {
+        e.preventDefault();
+        newIdx = selectedIndex % 2 === 0 && selectedIndex + 1 < count ? selectedIndex + 1 : selectedIndex;
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClick(questionObj.shuffledChoices[selectedIndex]);
+        return;
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
+        const idx = parseInt(e.key) - 1;
+        if (idx < count) {
+          e.preventDefault();
+          handleClick(questionObj.shuffledChoices[idx]);
+          return;
+        }
+      }
+      setSelectedIndex(newIdx);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answered, selectedIndex, questionObj, handleClick]);
+
+
+  const getButtonStyle = (choice, idx) => {
     const base = {
       width: '100%',
       padding: '10px 12px',
@@ -56,14 +101,17 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
       lineHeight: '1.3',
     };
 
-    if (!answered) {
-      return { ...base, background: '#18181b', borderColor: '#3f3f46', color: '#e4e4e7' };
-    }
-    if (choice === questionObj.answer) {
+    if (choice === questionObj.answer && answered) {
       return { ...base, background: 'rgba(0,255,102,0.15)', borderColor: '#00ff66', color: '#00ff66' };
     }
-    if (answered.selected === choice) {
+    if (answered && answered.selected === choice) {
       return { ...base, background: 'rgba(255,59,48,0.15)', borderColor: '#ff3b30', color: '#ff3b30' };
+    }
+    if (!answered && idx === selectedIndex) {
+      return { ...base, background: '#27272a', borderColor: '#60a5fa', color: '#fff', boxShadow: '0 0 10px rgba(96, 165, 250, 0.5)', transform: 'scale(1.02)' };
+    }
+    if (!answered) {
+      return { ...base, background: '#18181b', borderColor: '#3f3f46', color: '#e4e4e7' };
     }
     return { ...base, background: '#0d0d0f', borderColor: '#27272a', color: '#52525b' };
   };
@@ -90,12 +138,9 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
           <button
             key={idx}
             onClick={() => handleClick(choice)}
-            style={getButtonStyle(choice)}
-            onMouseEnter={(e) => {
-              if (!answered) e.currentTarget.style.borderColor = '#a78bfa';
-            }}
-            onMouseLeave={(e) => {
-              if (!answered) e.currentTarget.style.borderColor = '#3f3f46';
+            style={getButtonStyle(choice, idx)}
+            onMouseEnter={() => {
+              if (!answered) setSelectedIndex(idx);
             }}
           >
             <span style={{ color: '#71717a', marginRight: '6px', fontSize: '0.72rem' }}>
@@ -107,12 +152,29 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
       </div>
 
       {answered && (
-        <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
-          {answered.isCorrect
-            ? '⭕ せいかい！ すばらしい！'
-            : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
-          }
-        </div>
+        <>
+          <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
+            {answered.isCorrect
+              ? '⭕ せいかい！ すばらしい！'
+              : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
+            }
+          </div>
+          {questionObj.explanation && (
+            <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', border: '1px solid #52525b', fontSize: '0.8rem', color: '#e4e4e7', lineHeight: '1.4' }}>
+              <span style={{ color: '#fbbf24', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>💡 かいせつ</span>
+              {questionObj.explanation}
+            </div>
+          )}
+          {questionObj.explanation && (
+             <button
+               onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+               className="quiz-btn submit-btn"
+               style={{ marginTop: '8px', width: '100%' }}
+             >
+               つぎへ (ENTER)
+             </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -136,18 +198,23 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
-    if (!inputValue.trim() || answered) return;
+    if (answered) {
+      if (answered.isCorrect) onCorrect(); else onIncorrect();
+      return;
+    }
+    if (!inputValue.trim()) return;
 
     const isCorrect = checkAnswer(inputValue, questionObj);
     setAnswered({ isCorrect });
     recordAnswer(questionObj.id, isCorrect);
 
+    const hasExplanation = !!questionObj.explanation;
     if (isCorrect) {
       playCorrectSound();
-      setTimeout(() => onCorrect(), 900);
+      if (!hasExplanation) setTimeout(() => onCorrect(), 900);
     } else {
       playIncorrectSound();
-      setTimeout(() => onIncorrect(), 1400);
+      if (!hasExplanation) setTimeout(() => onIncorrect(), 1400);
     }
   };
 
@@ -235,23 +302,43 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect }) => {
         </div>
 
         <div className="quiz-buttons">
-          <button
-            type="submit"
-            className="quiz-btn submit-btn"
-            disabled={!inputValue.trim() || !!answered}
-            style={{ flex: 1 }}
-          >
-            {isMath ? '決定 (ENTER)' : 'こたえる (ENTER)'}
-          </button>
+          {!answered || !questionObj.explanation ? (
+            <button
+              type="submit"
+              className="quiz-btn submit-btn"
+              disabled={!inputValue.trim() || !!answered}
+              style={{ flex: 1 }}
+            >
+              {isMath ? '決定 (ENTER)' : 'こたえる (ENTER)'}
+            </button>
+          ) : null}
         </div>
       </form>
 
       {answered && (
-        <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
-          {answered.isCorrect
-            ? `⭕ せいかい！「${questionObj.answer}」だね！`
-            : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
-          }
+        <div style={{ marginTop: '10px' }}>
+          <div className={`quiz-result-message ${answered.isCorrect ? 'msg-correct' : 'msg-incorrect'}`}>
+            {answered.isCorrect
+              ? `⭕ せいかい！「${questionObj.answer}」だね！`
+              : `❌ ざんねん！ せいかいは「${questionObj.answer}」だよ`
+            }
+          </div>
+          {questionObj.explanation && (
+            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f46', borderRadius: '6px', padding: '10px', marginTop: '8px', fontSize: '0.85rem', color: '#e4e4e7', lineHeight: '1.4' }} className="explanation-box">
+              <strong style={{ color: '#fbbf24' }}>💡 解説:</strong><br/>
+              {questionObj.explanation}
+            </div>
+          )}
+          {questionObj.explanation && (
+            <button 
+              type="button"
+              className="quiz-btn submit-btn" 
+              style={{ width: '100%', marginTop: '10px', padding: '10px' }} 
+              onClick={() => answered.isCorrect ? onCorrect() : onIncorrect()}
+            >
+              次へ進む (Enter)
+            </button>
+          )}
         </div>
       )}
     </div>

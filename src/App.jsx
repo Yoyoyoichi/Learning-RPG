@@ -1,17 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps, react-hooks/purity, react-hooks/set-state-in-effect, react-hooks/immutability, no-unused-vars, no-empty, no-useless-assignment */
+import { useState, useEffect, useRef } from 'react';
 import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
-import { getRandomQuestion, setDefaultQuestions } from './utils/questions';
+import { getRandomQuestion, setDefaultQuestions, getCustomQuestions, QUESTIONS_DB } from './utils/questions';
 import { generateFloorStory } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
+import { syncAllToCloud, syncAllFromCloud } from './utils/sync';
 import {
   generateStarterDeck,
   getRandomRewardCards,
   createCardInstance,
   CARDS_DB
 } from './utils/cards';
+import { RELICS_DB, getRandomRelic } from './utils/relics';
 import {
   playMoveSound,
   playHitSound,
@@ -40,10 +43,12 @@ const generateDungeon = (floor) => {
 
   const rooms = [];
   const minSize = 5;
-  const maxRooms = Math.floor((COLS * ROWS) / 250); // Scale rooms by map area
+  const targetRooms = Math.min(15, Math.max(4, Math.floor((COLS * ROWS) / 250))); // Minimum 4 rooms, max 15
 
   // 2. Generate random rooms
-  for (let i = 0; i < maxRooms; i++) {
+  let attempts = 0;
+  while (rooms.length < targetRooms && attempts < 300) {
+    attempts++;
     // Dynamic max size for some larger rooms
     const currentMaxSize = Math.random() < 0.2 ? 12 : 8;
     const w = Math.floor(Math.random() * (currentMaxSize - minSize + 1)) + minSize;
@@ -54,7 +59,7 @@ const generateDungeon = (floor) => {
     // Check overlap with padding of 1
     let overlap = false;
     for (const r of rooms) {
-      if (x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y) {
+      if (x - 1 <= r.x + r.w && x + w + 1 >= r.x && y - 1 <= r.y + r.h && y + h + 1 >= r.y) {
         overlap = true;
         break;
       }
@@ -137,9 +142,17 @@ const generateDungeon = (floor) => {
 
   // Spawn Items
   const items = [];
-  const itemTypes = [
+  const commonItemTypes = [
     { subType: 'potion', char: 'P', name: 'ポーション' },
-    { subType: 'chest', char: 'C', name: '宝箱' }
+    { subType: 'chest', char: 'C', name: '宝箱' },
+    { subType: 'shop', char: '$', name: '商人' },
+    { subType: 'golden_apple', char: 'A', name: 'おうごんのリンゴ' },
+    { subType: 'magic_book', char: 'M', name: 'まほうの書' }
+  ];
+
+  const rareItemTypes = [
+    { subType: 'energy_crystal', char: 'E', name: 'エネルギークリスタル' },
+    { subType: 'magic_bag', char: 'B', name: 'まほうのふくろ' }
   ];
 
   const equipmentTypes = [
@@ -184,12 +197,15 @@ const generateDungeon = (floor) => {
     const itemY = Math.floor(room.y + Math.random() * room.h);
     
     if (!(itemX === lastRoom.cx && itemY === lastRoom.cy) && !(itemX === startPos.x && itemY === startPos.y)) {
-      // 70% consumable / chest, 30% equipment
       let selectedItem;
-      if (Math.random() < 0.3) {
+      if (Math.random() < 0.05) {
         selectedItem = equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)];
       } else {
-        selectedItem = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        if (floor >= 3 && Math.random() < 0.08) {
+          selectedItem = rareItemTypes[Math.floor(Math.random() * rareItemTypes.length)];
+        } else {
+          selectedItem = commonItemTypes[Math.floor(Math.random() * commonItemTypes.length)];
+        }
       }
 
       // Check overlaps
@@ -225,7 +241,10 @@ const INITIAL_PLAYER = {
   floor: 1,
   swordEquipped: false,
   shieldEquipped: false,
-  deck: []
+  maxEnergy: 3,
+  maxDraw: 3,
+  deck: [],
+  relics: []
 };
 
 // Enemy Intention generator
@@ -236,15 +255,15 @@ const rollEnemyIntent = (enemy, turnNumber) => {
   
   if (subType === 'slime') {
     if (seed < 0.5) {
-      return { type: 'attack', damage: atk, name: 'たいあたり', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: atk, weak: 1, name: 'ねばねばタックル', text: `こうげき (${atk}ダメージ + じゃくたいか)` };
     } else {
       return { type: 'defend', block: 4, name: 'からをふくらます', text: `ぼうぎょ (4ブロック)` };
     }
   } else if (subType === 'bat') {
     if (seed < 0.5) {
-      return { type: 'attack', damage: Math.max(2, atk - 1), name: 'ひっかき', text: `こうげき (${Math.max(2, atk - 1)}ダメージ)` };
+      return { type: 'attack', damage: Math.max(2, atk - 1), vulnerable: 1, name: 'きゅうこうか', text: `こうげき (${Math.max(2, atk - 1)}ダメージ + ゼイジャク)` };
     } else {
-      return { type: 'attack', damage: atk, name: 'かみつき', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: atk, lifesteal: true, name: 'かみつき', text: `きゅうけつ (${atk}ダメージ)` };
     }
   } else if (subType === 'skeleton') {
     if (turnNumber % 3 === 0) {
@@ -255,44 +274,46 @@ const rollEnemyIntent = (enemy, turnNumber) => {
       return { type: 'attack', damage: atk, name: 'なぎはらい', text: `こうげき (${atk}ダメージ)` };
     }
   } else if (subType === 'ghost') {
-    if (seed < 0.4) {
-      return { type: 'attack', damage: atk, name: 'のろいのひかり', text: `こうげき (${atk}ダメージ)` };
-    } else if (seed < 0.7) {
+    if (turnNumber % 3 === 2) {
+      return { type: 'debuff', weak: 1, name: 'のろい', text: `デバフ (じゃくたいか 1ターン)` };
+    } else if (seed < 0.5) {
       return { type: 'defend', block: 8, name: 'おんりょうのたて', text: `ぼうぎょ (8ブロック)` };
     } else {
-      return { type: 'attack', damage: atk + 2, name: 'ポルターガイスト', text: `つよいこうげき (${atk + 2}ダメージ)` };
+      return { type: 'attack', damage: Math.max(1, atk - 2), vulnerable: 1, name: 'ポルターガイスト', text: `こうげき (${Math.max(1, atk-2)}ダメージ + ゼイジャク)` };
     }
   } else if (subType === 'werewolf') {
     if (turnNumber % 2 === 0) {
-      return { type: 'attack', damage: atk + 3, name: 'れんぞくひっかき', text: `つよいこうげき (${atk + 3}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2)+1, multi: 3, name: 'れんぞくひっかき', text: `れんぞくこうげき (${Math.floor(atk/2)+1}x3ダメージ)` };
     } else if (seed < 0.3) {
-      return { type: 'defend', block: 5, name: 'みをかがめる', text: `ぼうぎょ (5ブロック)` };
+      return { type: 'defend', block: 5, strength: 1, name: 'とおぼえ', text: `ぼうぎょ＆チャージ (5ブロック + すじりょく1)` };
     } else {
       return { type: 'attack', damage: atk, name: 'かみつき', text: `こうげき (${atk}ダメージ)` };
     }
   } else if (subType === 'vampire') {
     if (seed < 0.4) {
-      return { type: 'attack', damage: atk + 5, name: 'きゅうけつ', text: `きゅうけつこうげき (${atk + 5}ダメージ)` };
+      return { type: 'attack', damage: atk + 5, lifesteal: true, name: 'きゅうけつ', text: `きゅうけつこうげき (${atk + 5}ダメージ)` };
     } else if (seed < 0.7) {
-      return { type: 'defend', block: 10, name: 'コウモリのむれ', text: `ぼうぎょ (10ブロック)` };
+      return { type: 'buff', strength: 2, name: 'ちをすする', text: `チャージ (すじりょく+2)` };
     } else {
-      return { type: 'attack', damage: atk, name: 'やみのはどう', text: `こうげき (${atk}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2), multi: 2, vulnerable: 1, name: 'やみのはどう', text: `れんぞくこうげき (${Math.floor(atk/2)}x2ダメージ + ゼイジャク)` };
     }
   } else if (subType === 'demon') {
     if (turnNumber % 3 === 0) {
       return { type: 'attack', damage: atk + 10, name: 'じごくのほのお', text: `ぜんたいこうげき (${atk + 10}ダメージ)` };
-    } else if (seed < 0.5) {
-      return { type: 'defend', block: 15, name: 'まほうのバリア', text: `ぼうぎょ (15ブロック)` };
+    } else if (turnNumber % 3 === 1) {
+      return { type: 'attack', damage: Math.max(1, atk - 5), weak: 2, name: 'あくむのいちげき', text: `こうげき (${Math.max(1, atk-5)}ダメージ + じゃくたいか 2ターン)` };
     } else {
-      return { type: 'attack', damage: atk + 2, name: 'ダークスラッシュ', text: `つよいこうげき (${atk + 2}ダメージ)` };
+      return { type: 'defend', block: 15, name: 'まほうのバリア', text: `ぼうぎょ (15ブロック)` };
     }
   } else if (subType === 'dragon') {
     if (turnNumber % 4 === 0) {
-      return { type: 'attack', damage: atk + 20, name: 'ドラゴンブレス', text: `ひっさつこうげき (${atk + 20}ダメージ)` };
+      return { type: 'attack', damage: atk + 20, vulnerable: 2, name: 'ドラゴンブレス', text: `ひっさつこうげき (${atk + 20}ダメージ + ゼイジャク 2ターン)` };
+    } else if (turnNumber % 4 === 3) {
+      return { type: 'buff', strength: 5, name: 'いきをすいこむ', text: `チャージ (すじりょく+5)` };
     } else if (seed < 0.4) {
       return { type: 'defend', block: 20, name: 'はがねのうろこ', text: `ぼうぎょ (20ブロック)` };
     } else {
-      return { type: 'attack', damage: atk + 5, name: 'かみくだき', text: `つよいこうげき (${atk + 5}ダメージ)` };
+      return { type: 'attack', damage: Math.floor(atk/2)+2, multi: 2, name: 'かみくだき', text: `れんぞくこうげき (${Math.floor(atk/2)+2}x2ダメージ)` };
     }
   }
   
@@ -309,11 +330,17 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [gameOver, setGameOver] = useState(false);
   const [gameVictory, setGameVictory] = useState(false);
+  const [syncToken, setSyncToken] = useState(localStorage.getItem('learning_rpg_sync_token') || '');
 
   // Card deck-building RPG States
   const [battle, setBattle] = useState(null);
-  const [campsite, setCampsite] = useState(null);
+  const [campsite, setCampsite] = useState(
+    window.location.search.includes('test=camp') 
+      ? { nextFloorNum: 2, showSmithDeck: true } 
+      : null
+  );
   const [cardReward, setCardReward] = useState(null);
+  const [shop, setShop] = useState(null);
 
   // Quiz and Word Learning States
   const [customWords, setCustomWords] = useState([]);
@@ -326,19 +353,46 @@ function App() {
   const roomDescriptionsRef = useRef([]);
   const visitedRoomsRef = useRef(new Set());
   const mapMessageTimerRef = useRef(null);
+  const lastMoveTimeRef = useRef(0);
   const [mapMessage, setMapMessage] = useState(null);
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
+  const [battleFocusIndex, setBattleFocusIndex] = useState(0);
+  const [cardRewardFocusIndex, setCardRewardFocusIndex] = useState(0);
+  const [campsiteActionFocusIndex, setCampsiteActionFocusIndex] = useState(0);
+  const [campsiteCardFocusIndex, setCampsiteCardFocusIndex] = useState(0);
+  const [shopFocusIndex, setShopFocusIndex] = useState(0);
+  const [isStealthMode, setIsStealthMode] = useState(() => localStorage.getItem('stealthMode') === 'true');
+
+  useEffect(() => { localStorage.setItem('stealthMode', isStealthMode); }, [isStealthMode]);
 
   useEffect(() => {
-    fetch('/default_questions.csv')
-      .then(res => res.text())
+    const handleKeyDown = (e) => {
+      // Shift + S shortcut for stealth mode
+      if (e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        setIsStealthMode(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    fetch(import.meta.env.BASE_URL + 'default_questions.csv?v=' + Date.now())
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch default questions');
+        return res.text();
+      })
       .then(csvText => {
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
+            if (!results.data || results.data.length === 0 || !results.data[0].question) {
+              console.error('Invalid CSV data');
+              return;
+            }
             const formatted = results.data.map(row => ({
               id: parseInt(row.id) || Date.now(),
               category: row.category,
@@ -346,6 +400,7 @@ function App() {
               question: row.question,
               answer: row.answer,
               choices: row.type === 'choice' ? [row.answer, row.dummy1, row.dummy2, row.dummy3].filter(Boolean) : undefined,
+              explanation: row.explanation || row['解説'] || row.解説 || '',
             }));
             setDefaultQuestions(formatted);
           }
@@ -355,6 +410,8 @@ function App() {
   }, []);
 
   const logEndRef = useRef(null);
+  const chattersPoolRef = useRef([]);
+  const chatterIndexRef = useRef(0);
   const [showDpad, setShowDpad] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -575,6 +632,13 @@ function App() {
 
   const handleCardClick = (card) => {
     if (gameOver || gameVictory || !battle) return;
+    if (battle.playerEnergy < card.cost) {
+      addLog("エナジーが足りない！", 'system');
+      return;
+    }
+    
+    // エナジーを即座に消費
+    setBattle(prev => ({ ...prev, playerEnergy: prev.playerEnergy - card.cost }));
 
     // まちがえた問題のIDリストを作る
     const reviewIds = Object.keys(learnedWords)
@@ -595,13 +659,36 @@ function App() {
     
     const intent = battle.enemyIntent;
     let actionText = "敵のターン...";
+    
     if (intent) {
-      if (intent.damage && intent.block) {
-        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ ＆ ${intent.block} ブロック！`;
-      } else if (intent.damage) {
-        actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.damage} ダメージ！`;
+      if (intent.damage !== undefined) {
+        let multi = intent.multi || 1;
+        let baseDmg = intent.damage + (battle.enemyStatus.strength || 0);
+        if (battle.playerStatus.vulnerable > 0) baseDmg = Math.floor(baseDmg * 1.5);
+        
+        let totalDmg = baseDmg * multi;
+        let playerBlock = battle.playerBlock;
+        let finalDmg = Math.max(0, totalDmg - playerBlock);
+
+        let attackStr = intent.multi ? `${baseDmg}x${multi} ダメージ` : `${baseDmg} ダメージ`;
+
+        if (finalDmg === 0) {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} ${isStealthMode ? '' : '🛡️'}完全にブロックした！`;
+        } else if (playerBlock > 0) {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr} (ブロック -${playerBlock} ＝ ${finalDmg}被ダメージ)`;
+        } else {
+          actionText = `${battle.enemy.name} の「${intent.name}」！\n${attackStr}を受けた！`;
+        }
+
+        if (intent.block) {
+          actionText += `\n＆ ${intent.block} ブロック！`;
+        }
       } else if (intent.block) {
         actionText = `${battle.enemy.name} の「${intent.name}」！\n${intent.block} ブロック！`;
+      } else if (intent.type === 'debuff') {
+        actionText = `${battle.enemy.name} の「${intent.name}」！\n弱体化を受けた！`;
+      } else if (intent.type === 'buff') {
+         actionText = `${battle.enemy.name} の「${intent.name}」！\n敵が強化された！`;
       } else {
         actionText = `${battle.enemy.name} は様子を見ている...`;
       }
@@ -619,48 +706,109 @@ function App() {
     }
   }, [isEnemyTurn, battle]);
 
+  const handleEnemyDefeat = (defeatedEnemy, currentPlayer) => {
+    addLog(`${defeatedEnemy.name} を倒した！`, 'level-up');
+    playVictorySound();
+    
+    const xpReward = defeatedEnemy.xp;
+    const goldReward = defeatedEnemy.gold;
+    currentPlayer.xp += xpReward;
+    currentPlayer.gold += goldReward;
+
+    if (currentPlayer.xp >= currentPlayer.xpNeeded) {
+      currentPlayer.level += 1;
+      currentPlayer.xp -= currentPlayer.xpNeeded;
+      currentPlayer.xpNeeded = Math.round(currentPlayer.xpNeeded * 1.5);
+      currentPlayer.maxHp += 8;
+      currentPlayer.hp = currentPlayer.maxHp;
+      currentPlayer.atk += 2;
+      currentPlayer.def += 1;
+      addLog(`レベルアップ！ レベル ${currentPlayer.level} になった！ (HP最大値+8、HP全回復)`, 'level-up');
+      playLevelUpSound();
+    }
+
+    const enemyX = defeatedEnemy.x;
+    const enemyY = defeatedEnemy.y;
+    const nextEnemies = enemies.filter(e => !(e.x === enemyX && e.y === enemyY));
+    setEnemies(nextEnemies);
+
+    setBattle(null);
+    setPlayer(currentPlayer);
+    
+    let actualGold = goldReward;
+    if (currentPlayer.relics && currentPlayer.relics.some(r => r.key === 'lucky_coin')) {
+      actualGold = Math.floor(actualGold * 1.2);
+    }
+    
+    if (currentPlayer.relics && currentPlayer.relics.some(r => r.key === 'vampire_tooth')) {
+      currentPlayer.hp = Math.min(currentPlayer.maxHp, currentPlayer.hp + 3);
+      addLog("レリック「きゅうけつきのキバ」の効果でHPが3回復した！", 'system');
+    }
+
+    setCardReward({
+      choices: getRandomRewardCards(currentPlayer.floor),
+      gold: actualGold,
+      xp: xpReward
+    });
+  };
+
   const resolveEnemyTurn = () => {
     if (gameOver || gameVictory || activeQuiz || !battle) return;
     
     let nextBattle = { ...battle };
     let nextPlayer = { ...player };
     
-    // 1. 敵の行動（意図）を実行する
     const intent = nextBattle.enemyIntent;
     if (intent) {
       addLog(`${nextBattle.enemy.name} のターン: 「${intent.name}」を使用！`, 'system');
       
       if (intent.damage !== undefined) {
-        let currentDmg = intent.damage;
-        let playerBlock = nextBattle.playerBlock;
-        let finalDmg = currentDmg;
+        let multiCount = intent.multi || 1;
         
-        if (playerBlock > 0) {
-          if (playerBlock >= currentDmg) {
-            nextBattle.playerBlock -= currentDmg;
-            finalDmg = 0;
-          } else {
-            finalDmg = currentDmg - playerBlock;
-            nextBattle.playerBlock = 0;
+        for (let m = 0; m < multiCount; m++) {
+          let baseDmg = intent.damage + (nextBattle.enemyStatus.strength || 0);
+          if (nextBattle.playerStatus.vulnerable > 0) {
+             baseDmg = Math.floor(baseDmg * 1.5);
           }
-        }
-        
-        if (finalDmg > 0) {
-          nextPlayer.hp = Math.max(0, nextPlayer.hp - finalDmg);
-          addLog(`プレイヤーは ${finalDmg} ダメージを受けた！`, 'damage-taken');
-          playHurtSound();
-          setScreenShake(true);
-          setTimeout(() => setScreenShake(false), 400);
+          let currentDmg = baseDmg;
+          let playerBlock = nextBattle.playerBlock;
+          let finalDmg = currentDmg;
           
-          if (nextPlayer.hp <= 0) {
-            setGameOver(true);
-            setBattle(null);
-            addLog("あなたは力尽きた...", 'damage-taken');
-            playGameOverSound();
-            return;
+          if (playerBlock > 0) {
+            if (playerBlock >= currentDmg) {
+              nextBattle.playerBlock -= currentDmg;
+              finalDmg = 0;
+            } else {
+              finalDmg = currentDmg - playerBlock;
+              nextBattle.playerBlock = 0;
+            }
           }
-        } else {
-          addLog("プレイヤーは攻撃を完全にブロックした！", 'system');
+          
+          if (finalDmg > 0) {
+            nextPlayer.hp = Math.max(0, nextPlayer.hp - finalDmg);
+            addLog(`プレイヤーは ${finalDmg} ダメージを受けた！`, 'damage-taken');
+            playHurtSound();
+            setScreenShake(true);
+            setTimeout(() => setScreenShake(false), 400);
+            
+            if (nextPlayer.hp <= 0) {
+              setGameOver(true);
+              setBattle(null);
+              addLog("あなたは力尽きた...", 'damage-taken');
+              playGameOverSound();
+              return;
+            }
+            
+            if (intent.lifesteal) {
+               let healAmount = Math.floor(finalDmg / 2);
+               if (healAmount > 0) {
+                 nextBattle.enemy.hp = Math.min(nextBattle.enemy.maxHp, nextBattle.enemy.hp + healAmount);
+                 addLog(`${nextBattle.enemy.name} はHPを ${healAmount} 吸収した！`, 'system');
+               }
+            }
+          } else {
+            addLog("プレイヤーは攻撃を完全にブロックした！", 'system');
+          }
         }
       }
       
@@ -668,14 +816,42 @@ function App() {
         nextBattle.enemyBlock += intent.block;
         addLog(`${nextBattle.enemy.name} は ${intent.block} のブロックを得た。`, 'system');
       }
+
+      if (intent.strength) {
+        nextBattle.enemyStatus.strength += intent.strength;
+        addLog(`${nextBattle.enemy.name} のパワーが上がった！`, 'system');
+      }
+      if (intent.weak) {
+        nextBattle.playerStatus.weak += intent.weak;
+        addLog(`プレイヤーは「じゃくたいか」を受けた！`, 'system');
+      }
+      if (intent.vulnerable) {
+        nextBattle.playerStatus.vulnerable += intent.vulnerable;
+        addLog(`プレイヤーは「ゼイジャク」になった！`, 'system');
+      }
     }
     
-    // 2. ターンの開始準備
-    nextBattle.turn += 1;
-    nextBattle.playerBlock = 0; // ブロックは毎ターンリセットされます
-    nextBattle.playerEnergy = nextBattle.playerMaxEnergy; // 互換性のために初期化
+    // Poison damage for enemy at END of their turn? Actually usually poison happens at the start of their turn, but here is fine.
+    if (nextBattle.enemyStatus.poison > 0) {
+       const pDmg = nextBattle.enemyStatus.poison;
+       nextBattle.enemy.hp = Math.max(0, nextBattle.enemy.hp - pDmg);
+       addLog(`毒により ${nextBattle.enemy.name} に ${pDmg} ダメージ！`, 'system');
+       nextBattle.enemyStatus.poison -= 1;
+       if (nextBattle.enemy.hp <= 0) {
+         handleEnemyDefeat(nextBattle.enemy, nextPlayer);
+         setIsEnemyTurn(false);
+         return;
+       }
+    }
 
-    // 手札を捨てて、山札から3枚引きます
+    // decrement player statuses
+    if (nextBattle.playerStatus.weak > 0) nextBattle.playerStatus.weak--;
+    if (nextBattle.playerStatus.vulnerable > 0) nextBattle.playerStatus.vulnerable--;
+
+    nextBattle.turn += 1;
+    nextBattle.playerBlock = 0; 
+    nextBattle.playerEnergy = nextBattle.playerMaxEnergy; 
+
     nextBattle.discardPile = [...nextBattle.discardPile, ...nextBattle.hand];
     nextBattle.hand = [];
     
@@ -683,7 +859,10 @@ function App() {
     let discardPile = [...nextBattle.discardPile];
     let hand = [];
     
-    for (let i = 0; i < 3; i++) {
+    let drawCount = nextPlayer.maxDraw || 3;
+    if (nextPlayer.relics && nextPlayer.relics.some(r => r.key === 'king_crown')) drawCount += 1;
+
+    for (let i = 0; i < drawCount; i++) {
       if (drawPile.length === 0) {
         if (discardPile.length === 0) break;
         drawPile = [...discardPile];
@@ -706,60 +885,60 @@ function App() {
 
   const renderBattleContent = () => {
     if (!battle) return null;
-    const { enemy, enemyBlock, enemyStatus, enemyIntent, turn, playerEnergy, playerBlock, playerStatus, hand, drawPile, discardPile, exhaustChoose } = battle;
+    const { enemy, enemyBlock, enemyIntent, turn, playerEnergy, playerBlock, hand } = battle;
 
     const getEnemySprite = (subType) => {
       switch(subType) {
-        case 'slime': return '🟢';
-        case 'bat': return '🦇';
-        case 'skeleton': return '💀';
-        case 'ghost': return '👻';
-        default: return '👾';
+        case 'slime': return (isStealthMode ? 'Slime' : '🟢');
+        case 'bat': return (isStealthMode ? 'Bat' : '🦇');
+        case 'skeleton': return (isStealthMode ? 'Skeleton' : '💀');
+        case 'ghost': return (isStealthMode ? 'Ghost' : '👻');
+        default: return (isStealthMode ? 'Enemy' : '👾');
       }
     };
 
     const getIntentionIcon = (intent) => {
-      if (!intent) return '❓';
+      if (!intent) return (isStealthMode ? '?' : '❓');
       switch(intent.type) {
-        case 'attack': return intent.multi ? '⚔️⚔️' : '⚔️';
-        case 'defend': return '🛡️';
-        case 'debuff': return '✨';
-        default: return '💤';
+        case 'attack': return intent.multi ? (isStealthMode ? 'Attack(x2)' : '⚔️⚔️') : (isStealthMode ? 'Attack' : '⚔️');
+        case 'defend': return (isStealthMode ? 'Defend' : '🛡️');
+        case 'debuff': return (isStealthMode ? 'Debuff' : '✨');
+        default: return (isStealthMode ? 'Sleep' : '💤');
       }
     };
 
     return (
-      <div className="battle-screen" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#09090b', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#f3f4f6', gap: '6px' }}>
+      <div className="battle-screen" style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '6px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #ff3e3e', borderRadius: '8px', color: '#111827', gap: '6px' }}>
         
         {isEnemyTurn && (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
-             <h2 style={{ color: '#ff3e3e', textShadow: '2px 2px 0 #000', fontSize: '1.8rem', animation: 'pulse 1s infinite', letterSpacing: '1px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.85)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
+             <h2 style={{ color: '#ff3e3e', textShadow: '1px 1px 0 #fff, -1px -1px 0 #fff', fontSize: '1.8rem', animation: 'pulse 1s infinite', letterSpacing: '1px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
                {enemyActionText}
              </h2>
           </div>
         )}
         
         {/* Arena */}
-        <div className="battle-arena" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: '130px', padding: '4px', borderBottom: '1px dashed #27272a' }}>
+        <div className="battle-arena" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: '130px', padding: '4px', borderBottom: '1px dashed #d1d5db' }}>
           
           {/* Player */}
           <div className="battle-character player-side" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '45%' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>🛡️👤</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '2px' }}>{isStealthMode ? '' : '🛡️👤'}</div>
             <div style={{ fontWeight: 'bold', fontSize: '1.0rem', color: '#ff3e3e' }}>ゆうしゃ</div>
             
             <div style={{ width: '100%', marginTop: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {player.hp} / {player.maxHp}</span>
-                {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {playerBlock}</span>}
+                {playerBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{isStealthMode ? '' : '🛡️ '}{playerBlock}</span>}
               </div>
-              <div style={{ height: '8px', background: '#27272a', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(player.hp / player.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
               </div>
             </div>
           </div>
 
           {/* Turn Marker */}
-          <div style={{ fontSize: '0.8rem', color: '#71717a', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.8rem', color: '#4b5563', textAlign: 'center' }}>
             <div>ターン</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#ff3e3e' }}>{turn}</div>
           </div>
@@ -772,20 +951,20 @@ function App() {
             <div style={{ width: '100%', marginTop: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '1px' }}>
                 <span>HP: {enemy.hp} / {enemy.maxHp}</span>
-                {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>🛡️ {enemyBlock}</span>}
+                {enemyBlock > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{isStealthMode ? '' : '🛡️ '}{enemyBlock}</span>}
               </div>
-              <div style={{ height: '8px', background: '#27272a', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '8px', background: '#d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', background: '#ef4444', width: `${(enemy.hp / enemy.maxHp) * 100}%`, transition: 'width 0.3s' }}></div>
               </div>
             </div>
 
             {enemyIntent && (
-              <div style={{ marginTop: '4px', background: '#1c1917', border: '1px solid #44403c', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }} title={enemyIntent.text}>
+              <div style={{ marginTop: '4px', background: '#f3f4f6', border: '1px solid #44403c', borderRadius: '4px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }} title={enemyIntent.text}>
                 <span>{getIntentionIcon(enemyIntent)}</span>
-                <span style={{ color: '#d6d3d1' }}>{enemyIntent.name}</span>
+                <span style={{ color: '#d1d5db' }}>{enemyIntent.name}</span>
                 <span style={{ color: '#f87171', fontWeight: 'bold' }}>
                   {enemyIntent.damage !== undefined ? `${enemyIntent.damage}` : ''}
-                  {enemyIntent.block !== undefined ? `+${enemyIntent.block}🛡️` : ''}
+                  {enemyIntent.block !== undefined ? (`+${enemyIntent.block}${isStealthMode ? '' : '🛡️'}`) : ''}
                 </span>
               </div>
             )}
@@ -794,49 +973,57 @@ function App() {
         </div>
 
         {/* Battle Logs / Feedback */}
-        <div style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '4px', padding: '6px 8px', height: '48px', overflowY: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', fontSize: '0.85rem', gap: '3px' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #d1d5db', borderRadius: '4px', padding: '6px 8px', height: '48px', overflowY: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', fontSize: '0.85rem', gap: '3px' }}>
           {logs.length > 0 ? logs.slice(-2).map((log, i) => (
-            <div key={i} style={{ color: log.type === 'damage-taken' ? '#ef4444' : log.type === 'damage-dealt' ? '#60a5fa' : log.type === 'level-up' ? '#fbbf24' : '#a1a1aa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animation: 'fadeIn 0.2s' }}>
+            <div key={i} style={{ color: log.type === 'damage-taken' ? '#ef4444' : log.type === 'damage-dealt' ? '#60a5fa' : log.type === 'level-up' ? '#fbbf24' : '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animation: 'fadeIn 0.2s' }}>
               &gt; {log.text}
             </div>
           )) : (
-            <div style={{ color: '#71717a', textAlign: 'center' }}>カードをえらんで、クイズにこたえよう！</div>
+            <div style={{ color: '#4b5563', textAlign: 'center' }}>カードをえらんで、クイズにこたえよう！</div>
           )}
         </div>
 
         {/* Card Hand and Turn controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', justifyContent: 'center' }}>
-            {hand.map((card) => {
-              const borderCol = card.type === 'attack' ? '#ff3e3e' : '#3b82f6';
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative', zIndex: 5 }}>
+          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingTop: '8px', paddingBottom: '2px', justifyContent: 'center' }}>
+            {hand.map((card, idx) => {
+              const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
+              const canPlay = playerEnergy >= card.cost;
+              const isFocused = idx === Math.min(battleFocusIndex, hand.length);
               return (
                 <button
-                  key={card.id}
-                  onClick={() => handleCardClick(card)}
+                  key={card.id || idx}
+                  onClick={() => canPlay ? handleCardClick(card) : null}
+                  disabled={!canPlay}
                   style={{
                     flex: '0 0 92px',
                     height: '110px',
-                    border: `1px solid ${borderCol}`,
+                    border: isFocused ? `3px solid #fbbf24` : `1px solid ${borderCol}`,
                     borderRadius: '4px',
-                    background: '#040405',
-                    color: '#f3f4f6',
+                    background: '#f9fafb',
+                    color: '#111827',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     padding: '5px',
-                    cursor: 'pointer',
                     textAlign: 'left',
-                    boxShadow: `0 0 6px ${borderCol}60`,
                     transition: 'transform 0.15s',
+                    position: 'relative',
+                    opacity: canPlay ? 1 : 0.4,
+                    boxShadow: isFocused ? `0 0 12px ${borderCol}, 0 0 0 2px #fbbf24` : (canPlay ? `0 0 6px ${borderCol}60` : 'none'),
+                    transform: isFocused ? 'scale(1.05) translateY(-5px)' : 'scale(1)',
+                    cursor: canPlay ? 'pointer' : 'not-allowed',
+                    outline: 'none',
                   }}
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#fca5a5' : '#93c5fd' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', color: card.type === 'attack' ? '#dc2626' : '#0284c7' }}>
                         {card.name}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
+                    <span style={{ background: borderCol, color: '#000', fontWeight: 'bold', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', position: 'absolute', top: '-6px', right: '-6px', zIndex: 10, border: '1px solid #fff' }}>{card.cost}</span>
+                    <div style={{ fontSize: '0.7rem', color: '#4b5563', lineHeight: '1.3', maxHeight: '65px', overflow: 'hidden', wordBreak: 'break-all' }}>
                       {card.desc}
                     </div>
                   </div>
@@ -845,22 +1032,34 @@ function App() {
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #27272a', paddingTop: '4px' }}>
-            <button
-              onClick={handleEndTurn}
-              style={{
-                padding: '6px 12px',
-                background: '#ef4444',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-              }}
-            >
-              ターン終了
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #d1d5db', paddingTop: '8px', paddingBottom: '4px' }}>
+            <div style={{ background: '#1e3a8a', color: '#93c5fd', fontWeight: 'bold', fontSize: '1.2rem', padding: '6px 16px', borderRadius: '8px', border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
+              {isStealthMode ? 'Energy: ' : '⚡ '}{playerEnergy} / {battle.playerMaxEnergy || 3}
+            </div>
+            {(() => {
+              const isEndTurnFocused = Math.min(battleFocusIndex, battle.hand.length) === battle.hand.length;
+              return (
+                <button
+                  onClick={handleEndTurn}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#ef4444',
+                    color: '#111827',
+                    border: isEndTurnFocused ? '3px solid #fbbf24' : 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: isEndTurnFocused ? '0 0 12px #ef4444' : 'none',
+                    transform: isEndTurnFocused ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'all 0.2s',
+                    outline: 'none',
+                  }}
+                >
+                  ターン終了
+                </button>
+              );
+            })()}
           </div>
         </div>
 
@@ -868,42 +1067,45 @@ function App() {
     );
   };
 
+  const handleCampsiteRest = () => {
+    setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
+    addLog(`${isStealthMode ? '' : '🛌 '}やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
+    playLevelUpSound();
+    
+    setTimeout(() => {
+      loadNextFloor(campsite.nextFloorNum);
+      setCampsite(null);
+    }, 1200);
+  };
+
+  const handleCampsiteUpgrade = (card) => {
+    const updatedDeck = player.deck.map(c => {
+      if (c.id === card.id) {
+        return createCardInstance(c.key, true);
+      }
+      return c;
+    });
+
+    setPlayer(prev => ({ ...prev, deck: updatedDeck }));
+    addLog(`${isStealthMode ? '' : '🔨 '}きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
+    playLevelUpSound();
+
+    loadNextFloor(campsite.nextFloorNum);
+    setCampsite(null);
+  };
+
   const renderCampsiteContent = () => {
     if (!campsite) return null;
     const { showSmithDeck } = campsite;
 
-    const handleRest = () => {
-      setPlayer(prev => ({ ...prev, hp: prev.maxHp }));
-      addLog(`🛌 やすむ をえらんだ。キャンプでゆっくりやすみ、HPが ぜんぶ かいふくした！`, 'system');
-      playLevelUpSound();
-      
-      setTimeout(() => {
-        loadNextFloor(campsite.nextFloorNum);
-        setCampsite(null);
-      }, 1200);
-    };
-
-    const handleSmithSelectCard = (card) => {
-      const updatedDeck = player.deck.map(c => {
-        if (c.id === card.id) {
-          return createCardInstance(c.key, true);
-        }
-        return c;
-      });
-
-      setPlayer(prev => ({ ...prev, deck: updatedDeck }));
-      addLog(`🔨 きたえる をえらんだ。カード「${card.name}」を「${card.name}+」につよくした！`, 'level-up');
-      playLevelUpSound();
-
-      loadNextFloor(campsite.nextFloorNum);
-      setCampsite(null);
-    };
+    const actionFocused = Math.min(campsiteActionFocusIndex, 1);
+    const cardFocused = Math.min(campsiteCardFocusIndex, player.deck.length);
 
     return (
-      <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: 'radial-gradient(circle, #2d1b10 0%, #0c0602 100%)', border: '1px solid #d97706', borderRadius: '8px', color: '#f3f4f6', gap: '12px' }}>
+      <div className="campsite-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '12px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #d97706', borderRadius: '8px', color: '#111827', gap: '12px' }}>
         {!showSmithDeck ? (
           <>
-            <div style={{ fontSize: '2.5rem', animation: 'pulse 2s infinite' }}>🔥</div>
+            <div style={{ fontSize: '2.5rem', animation: 'pulse 2s infinite' }}>{isStealthMode ? 'FIRE' : '🔥'}</div>
             <h2 style={{ color: '#f59e0b', margin: 0, fontSize: '1.1rem' }}>キャンプ（休憩場所）</h2>
             <p style={{ fontSize: '0.70rem', color: '#d1d5db', textAlign: 'center', maxWidth: '280px', lineHeight: '1.3' }}>
               つぎのフロアへすすむまえに、たきびのそばでゆっくりやすむか、カードを1枚つよくできます。
@@ -911,22 +1113,26 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '200px', marginTop: '6px' }}>
               <button
-                onClick={handleRest}
+                onClick={handleCampsiteRest}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #0f766e, #0d9488)',
-                  color: '#fff',
-                  border: '1px solid #14b8a6',
+                  color: '#111827',
+                  border: actionFocused === 0 ? '3px solid #fbbf24' : '1px solid #14b8a6',
+                  boxShadow: actionFocused === 0 ? '0 0 12px #0f766e, 0 0 0 2px #fbbf24' : 'none',
+                  transform: actionFocused === 0 ? 'scale(1.05)' : 'scale(1)',
                   borderRadius: '6px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
               >
-                <span>🛌 やすむ</span>
+                <span>{isStealthMode ? '' : '🛌 '}やすむ</span>
                 <span style={{ fontSize: '0.65rem' }}>HP ぜんぶかいふく</span>
               </button>
               
@@ -938,15 +1144,19 @@ function App() {
                   justifyContent: 'space-between',
                   padding: '8px 12px',
                   background: 'linear-gradient(to right, #b45309, #d97706)',
-                  color: '#fff',
-                  border: '1px solid #f59e0b',
+                  color: '#111827',
+                  border: actionFocused === 1 ? '3px solid #fbbf24' : '1px solid #f59e0b',
+                  boxShadow: actionFocused === 1 ? '0 0 12px #b45309, 0 0 0 2px #fbbf24' : 'none',
+                  transform: actionFocused === 1 ? 'scale(1.05)' : 'scale(1)',
                   borderRadius: '6px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
               >
-                <span>🔨 きたえる</span>
+                <span>{isStealthMode ? '' : '🔨 '}きたえる</span>
                 <span style={{ fontSize: '0.65rem' }}>カードをつよくする</span>
               </button>
             </div>
@@ -957,7 +1167,19 @@ function App() {
               <span style={{ fontWeight: 'bold', color: '#f59e0b', fontSize: '0.8rem' }}>つよくするカードをえらんでね:</span>
               <button
                 onClick={() => setCampsite(prev => ({ ...prev, showSmithDeck: false }))}
-                style={{ padding: '2px 6px', background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer' }}
+                style={{ 
+                  padding: '2px 6px', 
+                  background: '#d1d5db', 
+                  color: '#111827', 
+                  border: cardFocused === player.deck.length ? '2px solid #fbbf24' : 'none',
+                  boxShadow: cardFocused === player.deck.length ? '0 0 8px #9ca3af' : 'none',
+                  transform: cardFocused === player.deck.length ? 'scale(1.05)' : 'scale(1)',
+                  borderRadius: '4px', 
+                  fontSize: '0.65rem', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}
               >
                 もどる
               </button>
@@ -967,29 +1189,33 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {player.deck.map((card, idx) => {
                   const canUpgrade = !card.upgraded;
+                  const isFocused = idx === campsiteCardFocusIndex;
                   return (
                     <button
                       key={card.id || idx}
                       disabled={!canUpgrade}
-                      onClick={() => handleSmithSelectCard(card)}
+                      onClick={() => handleCampsiteUpgrade(card)}
                       style={{
                         padding: '4px',
-                        background: '#1f2937',
-                        border: `1px solid ${card.upgraded ? '#4b5563' : '#f59e0b'}`,
+                        background: isFocused ? '#fef08a' : '#ffffff',
+                        border: isFocused ? `3px solid #f59e0b` : `1px solid ${card.upgraded ? '#9ca3af' : '#f59e0b'}`,
                         borderRadius: '4px',
-                        color: card.upgraded ? '#9ca3af' : '#fff',
+                        color: card.upgraded ? '#9ca3af' : '#111827',
                         textAlign: 'left',
                         cursor: canUpgrade ? 'pointer' : 'default',
                         opacity: canUpgrade ? 1 : 0.6,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '1px'
+                        gap: '1px',
+                        boxShadow: isFocused ? `0 0 16px #fbbf24, 0 0 0 4px #f59e0b` : (canUpgrade ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'),
+                        transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'transform 0.15s, box-shadow 0.15s'
                       }}
                     >
-                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#fef08a' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: card.upgraded ? '#9ca3af' : '#d97706' }}>
                         {card.name}
                       </div>
-                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2' }}>
+                      <div style={{ fontSize: '0.58rem', lineHeight: '1.2', color: card.upgraded ? '#9ca3af' : '#4b5563' }}>
                         {card.desc}
                       </div>
                     </button>
@@ -1003,6 +1229,259 @@ function App() {
     );
   };
 
+  const getCardPrice = (card) => {
+    if (card.rarity === 'common') return 50;
+    if (card.rarity === 'uncommon') return 75;
+    if (card.rarity === 'rare') return 100;
+    return 50;
+  };
+
+  const handleShopBuyCard = (card) => {
+    const price = getCardPrice(card);
+    if (player.gold >= price) {
+      setPlayer(prev => ({ ...prev, gold: prev.gold - price, deck: [...prev.deck, card] }));
+      setShop(prev => ({ ...prev, cards: prev.cards.filter(c => c.id !== card.id) }));
+      addLog(`🪙 ${price}G支払い、「${card.name}」を購入した。`, 'system');
+    } else {
+      addLog(`ゴールドが足りない！`, 'system');
+    }
+  };
+
+  const handleShopBuyItem = (itemData) => {
+    if (player.gold >= itemData.cost) {
+      setPlayer(prev => {
+        let np = { ...prev, gold: prev.gold - itemData.cost };
+        if (itemData.key === 'potion') { np.hp = Math.min(np.maxHp, np.hp + 25); }
+        else if (itemData.key === 'golden_apple') { np.maxHp += 10; np.hp += 10; }
+        else if (itemData.key === 'energy_crystal') { np.maxEnergy = (np.maxEnergy || 3) + 1; }
+        else if (itemData.key === 'magic_bag') { np.maxDraw = (np.maxDraw || 3) + 1; }
+        return np;
+      });
+      setShop(prev => ({ ...prev, items: prev.items.filter(i => i.key !== itemData.key) }));
+      addLog(`🪙 ${itemData.cost}G支払い、「${itemData.name}」を購入した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopBuyWeapon = (weapon) => {
+    if (player.gold >= weapon.cost) {
+      setPlayer(prev => {
+        const np = { ...prev, gold: prev.gold - weapon.cost };
+        if (weapon.key === 'sword') {
+          np.swordLevel = (np.swordLevel || (np.swordEquipped ? 2 : 0)) + 1;
+          np.swordEquipped = true;
+        } else {
+          np.shieldLevel = (np.shieldLevel || (np.shieldEquipped ? 2 : 0)) + 1;
+          np.shieldEquipped = true;
+        }
+        return np;
+      });
+      setShop(prev => ({ ...prev, weapons: prev.weapons.filter(w => w.key !== weapon.key) }));
+      addLog(`🪙 ${weapon.cost}G支払い、「${weapon.name}」を購入した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopHeal = () => {
+    if (player.hp >= player.maxHp) {
+      addLog(`HPはすでに満タンだ。`, 'system');
+    } else if (player.gold >= 30) {
+      setPlayer(prev => ({ ...prev, gold: prev.gold - 30, hp: Math.min(prev.maxHp, prev.hp + 30) }));
+      addLog(`🪙 30G支払い、HPを30回復した。`, 'system');
+    } else { addLog(`ゴールドが足りない！`, 'system'); }
+  };
+
+  const handleShopRemoveCardSelect = (cardIndex) => {
+    if (!shop) return;
+    const { removeCost } = shop;
+    if (player.gold >= removeCost) {
+      setPlayer(prev => {
+        const newDeck = [...prev.deck];
+        const removed = newDeck.splice(cardIndex, 1)[0];
+        addLog(`🪙 ${removeCost}G支払い、「${removed.name}」を削除した。`, 'system');
+        return { ...prev, gold: prev.gold - removeCost, deck: newDeck, removedCount: (prev.removedCount || 0) + 1 };
+      });
+      setShop(prev => ({ ...prev, removeCost: prev.removeCost + 25, removeMode: false }));
+      setShopFocusIndex(0);
+    } else {
+      addLog(`ゴールドが足りない！`, 'system');
+      setShop(prev => ({ ...prev, removeMode: false }));
+      setShopFocusIndex(0);
+    }
+  };
+
+  const handleShopLeave = () => {
+    addLog("ショップをあとにした。", 'system');
+    setShop(null);
+  };
+
+  const renderShopContent = () => {
+    if (!shop) return null;
+    const { cards, items, weapons, removeCost, removeMode } = shop;
+
+    if (removeMode) {
+      const cancelFocused = Math.min(shopFocusIndex, player.deck.length) === player.deck.length;
+      return (
+        <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontWeight: 'bold', color: '#dc2626' }}>削除するカードを選んでください ({removeCost}G)</span>
+            <button 
+              onClick={() => { setShop(prev => ({ ...prev, removeMode: false })); setShopFocusIndex(0); }} 
+              style={{ 
+                padding: '2px 6px', 
+                fontSize: '0.7rem',
+                border: cancelFocused ? '2px solid #fbbf24' : '1px solid #9ca3af',
+                boxShadow: cancelFocused ? '0 0 8px #9ca3af' : 'none',
+                transform: cancelFocused ? 'scale(1.05)' : 'scale(1)',
+                transition: 'all 0.1s',
+                outline: 'none'
+              }}
+            >キャンセル</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              {player.deck.map((card, idx) => {
+                const isFocused = Math.min(shopFocusIndex, player.deck.length) === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleShopRemoveCardSelect(idx)}
+                    style={{ 
+                      padding: '4px', 
+                      background: '#fee2e2', 
+                      border: isFocused ? '3px solid #fbbf24' : '1px solid #ef4444', 
+                      borderRadius: '4px', 
+                      textAlign: 'left', 
+                      cursor: 'pointer',
+                      boxShadow: isFocused ? '0 0 12px #ef4444, 0 0 0 2px #fbbf24' : 'none',
+                      transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'all 0.15s',
+                      outline: 'none'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', fontSize: '0.7rem', color: '#b91c1c' }}>{card.name}</div>
+                    <div style={{ fontSize: '0.6rem' }}>{card.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    let renderIdx = 0;
+
+    return (
+      <div className="shop-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #eab308', borderRadius: '8px', color: '#111827', gap: '8px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ color: '#d97706', margin: 0, fontSize: '1rem' }}>商人</h2>
+          <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>所持金: {player.gold} G</div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '4px', width: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {cards.map((card, idx) => {
+            const price = getCardPrice(card);
+            const canAfford = player.gold >= price;
+            const isFocused = renderIdx++ === Math.min(shopFocusIndex, renderIdx + (shop.cards ? shop.cards.length : 0) + (shop.items ? shop.items.length : 0) + (shop.weapons ? shop.weapons.length : 0) + 3);
+            return (
+              <button 
+                key={idx} 
+                onClick={() => handleShopBuyCard(card)} 
+                style={{ 
+                  flex: '0 1 100px', 
+                  border: isFocused ? '3px solid #fbbf24' : `1px solid #eab308`, 
+                  borderRadius: '4px', 
+                  background: canAfford ? '#ffffff' : '#f3f4f6', 
+                  padding: '5px', 
+                  cursor: canAfford ? 'pointer' : 'not-allowed', 
+                  textAlign: 'left', 
+                  opacity: canAfford ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #eab308, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
+                <div style={{ fontWeight: 'bold', fontSize: '0.62rem' }}>{card.name}</div>
+                <div style={{ fontSize: '0.6rem', color: '#f59e0b', textAlign: 'center', marginTop: '4px' }}>{price} G</div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ borderTop: '1px dashed #d1d5db', margin: '4px 0' }}></div>
+        <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#4b5563', marginBottom: '2px' }}>その他のサービス</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+          {items && items.map((item, idx) => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button 
+                key={`i${idx}`} 
+                onClick={() => handleShopBuyItem(item)} 
+                disabled={player.gold < item.cost} 
+                style={{ 
+                  padding: '6px', background: '#fff', 
+                  border: isFocused ? '3px solid #fbbf24' : '1px solid #3b82f6', 
+                  borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= item.cost ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #3b82f6, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
+                {item.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.cost} G</span>
+              </button>
+            );
+          })}
+          {weapons && weapons.map((w, idx) => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button 
+                key={`w${idx}`} 
+                onClick={() => handleShopBuyWeapon(w)} 
+                disabled={player.gold < w.cost} 
+                style={{ 
+                  padding: '6px', background: '#fff', 
+                  border: isFocused ? '3px solid #fbbf24' : '1px solid #8b5cf6', 
+                  borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= w.cost ? 1 : 0.6,
+                  boxShadow: isFocused ? '0 0 12px #8b5cf6, 0 0 0 2px #fbbf24' : 'none',
+                  transform: isFocused ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
+                }}>
+                {w.name} <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{w.cost} G</span>
+              </button>
+            );
+          })}
+          
+          {(() => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button onClick={handleShopHeal} disabled={player.gold < 30} style={{ padding: '6px', background: '#fff', border: isFocused ? '3px solid #fbbf24' : '1px solid #10b981', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= 30 ? 1 : 0.6, boxShadow: isFocused ? '0 0 12px #10b981, 0 0 0 2px #fbbf24' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+                HP30 回復 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>30 G</span>
+              </button>
+            );
+          })()}
+
+          {(() => {
+            const isFocused = renderIdx++ === shopFocusIndex;
+            return (
+              <button onClick={() => { setShop(prev => ({ ...prev, removeMode: true })); setShopFocusIndex(0); }} disabled={player.gold < removeCost || player.deck.length <= 1} style={{ padding: '6px', background: '#fff', border: isFocused ? '3px solid #fbbf24' : '1px solid #ef4444', borderRadius: '4px', fontSize: '0.7rem', opacity: player.gold >= removeCost ? 1 : 0.6, boxShadow: isFocused ? '0 0 12px #ef4444, 0 0 0 2px #fbbf24' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+                カード削除 <br/><span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{removeCost} G</span>
+              </button>
+            );
+          })()}
+        </div>
+
+        {(() => {
+          const isFocused = renderIdx++ === shopFocusIndex;
+          return (
+            <button onClick={handleShopLeave} style={{ marginTop: 'auto', padding: '8px 10px', background: '#d1d5db', color: '#111827', border: isFocused ? '3px solid #fbbf24' : 'none', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold', alignSelf: 'center', boxShadow: isFocused ? '0 0 12px #9ca3af' : 'none', transform: isFocused ? 'scale(1.05)' : 'scale(1)', transition: 'all 0.15s', outline: 'none' }}>
+              店を出る
+            </button>
+          );
+        })()}
+      </div>
+    );
+  };
+
   const renderCardRewardContent = () => {
     if (!cardReward) return null;
     const { choices, gold, xp } = cardReward;
@@ -1012,31 +1491,33 @@ function App() {
         ...prev,
         deck: [...prev.deck, card]
       }));
-      addLog(`🎁 デッキに「${card.name}」を追加した。`, 'system');
+      addLog(`${isStealthMode ? '' : '🎁 '}デッキに「${card.name}」を追加した。`, 'system');
       setCardReward(null);
+    setShop(null);
     };
 
     const handleSkip = () => {
-      addLog("🎁 カード報酬をスキップした。", 'system');
+      addLog((isStealthMode ? 'カード報酬をスキップした。' : '🎁 カード報酬をスキップした。'), 'system');
       setCardReward(null);
     };
 
     return (
-      <div className="reward-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '10px', boxSizing: 'border-box', background: '#0a0a0c', border: '1px solid #10b981', borderRadius: '8px', color: '#f3f4f6', gap: '8px' }}>
+      <div className="reward-screen" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '10px', boxSizing: 'border-box', background: '#f3f4f6', border: '1px solid #10b981', borderRadius: '8px', color: '#111827', gap: '8px' }}>
         <h2 style={{ color: '#10b981', margin: 0, fontSize: '1rem' }}>戦闘勝利！獲得報酬</h2>
         
-        <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', background: '#18181b', padding: '4px 8px', borderRadius: '4px' }}>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', background: '#ffffff', padding: '4px 8px', borderRadius: '4px' }}>
           <span style={{ color: '#fbbf24' }}>🪙 +{gold} G</span>
-          <span style={{ color: '#60a5fa' }}>✨ +{xp} XP</span>
+          <span style={{ color: '#60a5fa' }}>{isStealthMode ? '' : '✨ '}+{xp} XP</span>
         </div>
 
-        <div style={{ fontSize: '0.65rem', color: '#9ca3af' }}>
+        <div style={{ fontSize: '0.65rem', color: '#4b5563' }}>
           デッキに加えるカードを選んでください：
         </div>
 
         <div style={{ display: 'flex', gap: '4px', width: '100%', justifyContent: 'center' }}>
           {choices.map((card, idx) => {
             const borderCol = card.type === 'attack' ? '#ff3e3e' : card.type === 'skill' ? '#3b82f6' : '#eab308';
+            const isFocused = idx === Math.min(cardRewardFocusIndex, choices.length);
             return (
               <button
                 key={card.id || idx}
@@ -1044,25 +1525,25 @@ function App() {
                 style={{
                   flex: '0 1 100px',
                   height: '120px',
-                  border: `1px solid ${borderCol}`,
+                  border: isFocused ? '3px solid #fbbf24' : `1px solid ${borderCol}`,
                   borderRadius: '4px',
-                  background: '#020617',
-                  color: '#fff',
+                  background: '#ffffff',
+                  color: '#111827',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   padding: '5px',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  boxShadow: `0 3px 5px rgba(0, 0, 0, 0.3)`,
-                  transition: 'transform 0.15s'
+                  boxShadow: isFocused ? `0 0 12px ${borderCol}, 0 0 0 2px #fbbf24` : `0 3px 5px rgba(0, 0, 0, 0.3)`,
+                  transform: isFocused ? 'scale(1.05) translateY(-5px)' : 'scale(1)',
+                  transition: 'all 0.15s',
+                  outline: 'none'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.62rem', color: card.type === 'attack' ? '#fca5a5' : card.type === 'skill' ? '#93c5fd' : '#fef08a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70px' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.62rem', color: card.type === 'attack' ? '#dc2626' : card.type === 'skill' ? '#0284c7' : '#d97706', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70px' }}>
                       {card.name}
                     </span>
                     <span style={{
@@ -1080,11 +1561,11 @@ function App() {
                       {card.cost}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.55rem', color: '#d1d5db', lineHeight: '1.2', maxHeight: '65px', overflow: 'hidden' }}>
+                  <div style={{ fontSize: '0.55rem', color: '#4b5563', lineHeight: '1.2', maxHeight: '65px', overflow: 'hidden' }}>
                     {card.desc}
                   </div>
                 </div>
-                <div style={{ fontSize: '0.5rem', color: '#71717a' }}>
+                <div style={{ fontSize: '0.5rem', color: '#4b5563' }}>
                   <span>{card.rarity}</span>
                 </div>
               </button>
@@ -1096,13 +1577,17 @@ function App() {
           onClick={handleSkip}
           style={{
             padding: '3px 10px',
-            background: '#374151',
-            color: '#fff',
-            border: 'none',
+            background: '#d1d5db',
+            color: '#111827',
+            border: cardRewardFocusIndex === choices.length ? '3px solid #fbbf24' : 'none',
             borderRadius: '4px',
             fontSize: '0.65rem',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            boxShadow: cardRewardFocusIndex === choices.length ? '0 0 12px #9ca3af' : 'none',
+            transform: cardRewardFocusIndex === choices.length ? 'scale(1.05)' : 'scale(1)',
+            transition: 'all 0.15s',
+            outline: 'none'
           }}
         >
           スキップ
@@ -1113,12 +1598,32 @@ function App() {
 
   const renderExplorationMapContent = () => (
     <div className="map-panel-body" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start', minHeight: '32px' }}>
+        <div style={{ flex: 1 }}>
+          {mapMessage && (
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #0284c7',
+              color: '#111827',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              textAlign: 'left',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+              fontSize: '0.8rem',
+              lineHeight: '1.4',
+              fontStyle: 'italic',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              「{mapMessage}」
+            </div>
+          )}
+        </div>
         <button 
           type="button" 
           className="layout-ctrl-btn" 
           onClick={() => setShowDpad(prev => !prev)} 
-          style={{ color: showDpad ? '#00ff66' : '#888' }}
+          style={{ color: showDpad ? '#059669' : '#888', marginLeft: '8px', whiteSpace: 'nowrap', marginTop: '2px' }}
           title="コントローラーの表示/非表示"
         >
           {showDpad ? '🎮 パッド非表示' : '🎮 パッド表示'}
@@ -1126,26 +1631,6 @@ function App() {
       </div>
       <div className="map-container-wrapper" style={{ position: 'relative' }}>
         <TileMap grid={renderGrid} />
-        {mapMessage && (
-          <div style={{
-            position: 'absolute',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(0, 0, 0, 0.85)',
-            border: '1px solid #ff3e3e',
-            color: '#fff',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            zIndex: 100,
-            textAlign: 'center',
-            boxShadow: '0 4px 12px rgba(255,62,62,0.2)',
-            pointerEvents: 'none',
-            minWidth: '200px'
-          }}>
-            <span style={{ fontStyle: 'italic', fontSize: '0.85rem', lineHeight: '1.4' }}>{mapMessage}</span>
-          </div>
-        )}
       </div>
       <div className="controls-wrapper" style={{ width: '100%' }}>
         {showDpad ? (
@@ -1163,7 +1648,7 @@ function App() {
             <button className="dpad-btn empty"></button>
           </div>
         ) : (
-          <div className="keyboard-hint" style={{ fontSize: '0.72rem', color: '#71717a', textAlign: 'center', padding: '0.5rem', border: '1px dashed #27272a', borderRadius: '8px', lineHeight: '1.3' }}>
+          <div className="keyboard-hint" style={{ fontSize: '0.72rem', color: '#4b5563', textAlign: 'center', padding: '0.5rem', border: '1px dashed #d1d5db', borderRadius: '8px', lineHeight: '1.3' }}>
             ⌨️ 矢印キー / WASD<br/>で移動できます。<br/>Spaceで待機。
           </div>
         )}
@@ -1185,6 +1670,9 @@ function App() {
     }
     if (campsite) {
       return renderCampsiteContent();
+    }
+    if (shop) {
+      return renderShopContent();
     }
     if (cardReward) {
       return renderCardRewardContent();
@@ -1248,13 +1736,13 @@ function App() {
         EQUIPPED RELICS
       </div>
       <div className="inventory-list">
-        <div className={`inventory-slot ${player.swordEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.swordEquipped ? '🗡️' : '➖'}</span>
-          <span>{player.swordEquipped ? '鉄の剣 (開始時 筋力+2)' : '遺物スロット'}</span>
+        <div className={`inventory-slot ${player.swordLevel || player.swordEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.swordLevel || player.swordEquipped ? (isStealthMode ? 'Swd' : '🗡️') : (isStealthMode ? '-' : '➖')}</span>
+          <span>{player.swordLevel || player.swordEquipped ? `剣 Lv.${player.swordLevel || (player.swordEquipped ? 2 : 0)} (開始時 筋力+${player.swordLevel || 2})` : '遺物スロット'}</span>
         </div>
-        <div className={`inventory-slot ${player.shieldEquipped ? 'equipped' : ''}`}>
-          <span className="equip-icon">{player.shieldEquipped ? '🛡️' : '➖'}</span>
-          <span>{player.shieldEquipped ? '鉄の盾 (開始時 3ブ & 金+2)' : '遺物スロット'}</span>
+        <div className={`inventory-slot ${player.shieldLevel || player.shieldEquipped ? 'equipped' : ''}`}>
+          <span className="equip-icon">{player.shieldLevel || player.shieldEquipped ? (isStealthMode ? 'Defend' : '🛡️') : (isStealthMode ? '-' : '➖')}</span>
+          <span>{player.shieldLevel || player.shieldEquipped ? `盾 Lv.${player.shieldLevel || (player.shieldEquipped ? 2 : 0)} (開始時 ブロック+${(player.shieldLevel || 2) * 2})` : '遺物スロット'}</span>
         </div>
       </div>
     </div>
@@ -1317,6 +1805,7 @@ function App() {
         alert('セーブデータを読み込みました！ページを更新します。');
         window.location.reload();
       } catch (err) {
+        console.error(err);
         alert('セーブデータの読み込みに失敗しました。');
       }
     };
@@ -1326,97 +1815,177 @@ function App() {
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target.result;
-        const lines = text.split('\n');
-        const customQuestions = [];
-        // Expected format: id,category,type,question,answer,choices(comma separated if choice type)
-        // Skip header if first line contains "id"
-        let startIndex = lines[0].toLowerCase().includes('id') ? 1 : 0;
-        
-        for (let i = startIndex; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
+    
+    Papa.parse(file, {
+      skipEmptyLines: true,
+      complete: (results) => {
+        try {
+          const customQuestions = [];
+          const data = results.data;
           
-          const parts = line.split(',');
-          if (parts.length < 5) continue;
-          
-          const type = parts[2].trim();
-          const qObj = {
-            id: parseInt(parts[0].trim()) || (1000 + i),
-            category: parts[1].trim(),
-            type: type,
-            question: parts[3].trim(),
-            answer: parts[4].trim(),
-          };
-          
-          if (type === 'choice' && parts.length >= 8) {
-            qObj.choices = [parts[4].trim(), parts[5].trim(), parts[6].trim(), parts[7].trim()];
+          let startIndex = 0;
+          if (data.length > 0 && data[0].length > 0 && String(data[0][0]).toLowerCase().includes('id')) {
+            startIndex = 1;
           }
           
-          customQuestions.push(qObj);
+          for (let i = startIndex; i < data.length; i++) {
+            const parts = data[i];
+            if (parts.length < 5) continue;
+            
+            const type = parts[2] ? parts[2].trim() : 'choice';
+            const qObj = {
+              id: parseInt(parts[0]) || (1000 + i),
+              category: parts[1] ? parts[1].trim() : '',
+              type: type,
+              question: parts[3] ? parts[3].trim() : '',
+              answer: parts[4] ? parts[4].trim() : '',
+            };
+            
+            if (type === 'choice' && parts.length >= 8) {
+              qObj.choices = [
+                parts[4] ? parts[4].trim() : '', 
+                parts[5] ? parts[5].trim() : '', 
+                parts[6] ? parts[6].trim() : '', 
+                parts[7] ? parts[7].trim() : ''
+              ].filter(Boolean);
+            } else if (type === 'choice') {
+              qObj.choices = [qObj.answer];
+            }
+            if (parts.length > 8 && parts[8]) {
+              qObj.explanation = parts[8].trim();
+            }
+            
+            customQuestions.push(qObj);
+          }
+          
+          // 余計なことはせず、既存のリストを完全に上書きして切り替える
+          localStorage.setItem('learning_rpg_custom_questions', JSON.stringify(customQuestions));
+          
+          alert(`CSVから問題を ${customQuestions.length} 問ロードしました！\n画面を再読み込みして問題を切り替えます。`);
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert('CSVの読み込みに失敗しました。');
         }
-        
-        const existingCustom = JSON.parse(localStorage.getItem('learning_rpg_custom_questions') || '[]');
-        const updatedCustom = [...existingCustom, ...customQuestions];
-        localStorage.setItem('learning_rpg_custom_questions', JSON.stringify(updatedCustom));
-        
-        alert(`カスタム問題を ${customQuestions.length} 問追加しました！`);
-      } catch (err) {
-        alert('CSVの読み込みに失敗しました。');
       }
-    };
-    reader.readAsText(file);
+    });
   };
 
   const renderSettingsContent = () => {
     let stats = {};
     try {
-      stats = JSON.parse(localStorage.getItem('learning_rpg_stats') || '{}');
-    } catch(e) {}
+      const parsed = JSON.parse(localStorage.getItem('learning_rpg_stats') || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        stats = parsed;
+      }
+    } catch (err) { console.error(err); }
     
     return (
-      <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#09090b', color: '#e4e4e7' }}>
-        <h3 style={{ margin: 0, color: '#facc15' }}>💾 セーブ＆ロード</h3>
+      <div className="retro-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', overflowY: 'auto', background: '#f3f4f6', color: '#111827' }}>
+        <h3 style={{ margin: 0, color: '#facc15' }}>{isStealthMode ? '' : '💾 '}セーブ＆ロード</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={handleExportSave} style={{ flex: 1, padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            📥 セーブ書き出し
+            {isStealthMode ? '' : '📥 '}セーブ書き出し
           </button>
           <label style={{ flex: 1, padding: '8px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
-            📤 セーブ読み込み
+            {isStealthMode ? '' : '📤 '}セーブ読み込み
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportSave} />
           </label>
         </div>
+
+        <h3 style={{ margin: '10px 0 0', color: '#14b8a6' }}>{isStealthMode ? '' : '☁️ '}クラウド同期 (GitHub)</h3>
+        <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
+          GitHubのTokenを入力して、PCとiPadのデータを同期します。
+        </p>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <input 
+            type="password" 
+            value={syncToken} 
+            onChange={(e) => setSyncToken(e.target.value)} 
+            placeholder="ghp_..." 
+            style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} 
+          />
+          <button 
+            onClick={async () => {
+              if (!syncToken) return alert('Tokenを入力してください');
+              localStorage.setItem('learning_rpg_sync_token', syncToken);
+              alert('クラウドから読み込んでいます...');
+              const success = await syncAllFromCloud(syncToken);
+              if (success) {
+                alert('同期成功！画面を再読み込みします。');
+                window.location.reload();
+              } else {
+                alert('クラウドにデータが見つかりませんでした。初めての方は「保存」を押してデータを作成してください。');
+              }
+            }}
+            style={{ padding: '8px', background: '#0d9488', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            {isStealthMode ? '' : '☁️ '}読込
+          </button>
+          <button 
+            onClick={async () => {
+              if (!syncToken) return alert('Tokenを入力してください');
+              localStorage.setItem('learning_rpg_sync_token', syncToken);
+              alert('クラウドに保存しています...');
+              const success = await syncAllToCloud();
+              if (success) alert('クラウドへの保存が完了しました！');
+              else alert('保存に失敗しました。');
+            }}
+            style={{ padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            {isStealthMode ? '' : '☁️ '}保存
+          </button>
+        </div>
         
-        <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>📝 カスタム問題の追加 (CSV)</h3>
-        <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 5px' }}>
+        <h3 style={{ margin: '10px 0 0', color: '#a78bfa' }}>{isStealthMode ? '' : '📝 '}カスタム問題の追加 (CSV)</h3>
+        <p style={{ fontSize: '0.75rem', color: '#4b5563', margin: '0 0 5px' }}>
           フォーマット: ID, カテゴリ, type(choice/input), 問題文, 正解, ダミー1, ダミー2, ダミー3
         </p>
         <label style={{ padding: '8px', background: '#9333ea', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center' }}>
-          📄 CSVファイルを読み込む
+          {isStealthMode ? '' : '📄 '}CSVファイルを読み込む
           <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImportCSV} />
         </label>
+        
+        <button 
+          onClick={async () => {
+            if (window.confirm('学習記録と問題集のデータをすべてリセットし、初期状態に戻しますか？（クラウド同期中ならクラウドのデータもリセットされます）')) {
+              localStorage.removeItem('learning_rpg_custom_questions');
+              localStorage.removeItem('learning_rpg_stats');
+              
+              if (syncToken) {
+                await syncAllToCloud(); // クラウドも空の状態で上書き
+              }
+              
+              alert('データをすべてリセットしました。画面を再読み込みします。');
+              window.location.reload();
+            }
+          }}
+          style={{ marginTop: '8px', padding: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', textAlign: 'center', width: '100%' }}
+        >
+          {isStealthMode ? '' : '🗑️ '}バグデータをリセット（初期化）
+        </button>
 
-        <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>📊 成績・学習記録</h3>
+        <h3 style={{ margin: '10px 0 0', color: '#4ade80' }}>{isStealthMode ? '' : '📊 '}成績・学習記録</h3>
         <div style={{ marginBottom: '8px' }}>
           <button onClick={exportStatsToCSV} style={{ width: '100%', padding: '8px', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            📊 成績をCSVで書き出し (Excel用)
+            {isStealthMode ? '' : '📊 '}成績をCSVで書き出し (Excel用)
           </button>
         </div>
         
         {Object.keys(stats).length === 0 ? (
-          <div style={{ fontSize: '0.85rem', color: '#71717a' }}>まだ記録がありません。クイズに答えよう！</div>
+          <div style={{ fontSize: '0.85rem', color: '#4b5563' }}>まだ記録がありません。クイズに答えよう！</div>
         ) : (
           <div style={{ fontSize: '0.8rem', display: 'grid', gap: '4px' }}>
             {Object.entries(stats).map(([qId, s]) => {
-              const total = s.correct + s.incorrect;
-              const rate = total > 0 ? Math.round((s.correct / total) * 100) : 0;
+              if (!s || typeof s !== 'object') return null;
+              const correct = s.correct || 0;
+              const incorrect = s.incorrect || 0;
+              const total = correct + incorrect;
+              const rate = total > 0 ? Math.round((correct / total) * 100) : 0;
               return (
-                <div key={qId} style={{ background: '#18181b', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
+                <div key={qId} style={{ background: '#ffffff', padding: '6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', borderLeft: `3px solid ${rate >= 80 ? '#4ade80' : rate <= 40 ? '#f87171' : '#facc15'}` }}>
                   <span>Q-ID: {qId}</span>
-                  <span>正解: {s.correct} / 不正解: {s.incorrect} ({rate}%)</span>
+                  <span>正解: {correct} / 不正解: {incorrect} ({rate}%)</span>
                 </div>
               );
             })}
@@ -1431,12 +2000,10 @@ function App() {
       learnedWords={learnedWords}
       customWordsCount={customWords.length}
       deck={player.deck}
-      onImportCustomWords={(words) => {
-        setCustomWords(words);
-        addLog(`カスタム単語リスト (${words.length}語) を読み込みました！`, 'system');
-      }}
+      onImportCustomWords={handleImportCSV}
       onClearCustomWords={() => {
         setCustomWords([]);
+        localStorage.removeItem('learning_rpg_custom_questions');
         addLog("デフォルトの単語リストに戻しました。", 'system');
       }}
     />
@@ -1520,21 +2087,17 @@ function App() {
     }
   }, [logs]);
 
-  // Load first floor on mount
-  useEffect(() => {
-    startNewGame();
-  }, []);
-
   // Initialize/Restart Game
   const startNewGame = () => {
     setIsStoryLoading(true);
     setFloorStory(null);
-    generateFloorStory(1).then(data => {
-      setFloorStory(data.story);
-      roomDescriptionsRef.current = data.rooms || [];
-      visitedRoomsRef.current = new Set();
-      setIsStoryLoading(false);
-    });
+    setIsStoryLoading(false);
+    chattersPoolRef.current = [
+      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+    ];
+    chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(1);
     setGrid(dungeon.grid);
@@ -1555,26 +2118,24 @@ function App() {
     setBattle(null);
     setCampsite(null);
     setCardReward(null);
-    
-    const welcomeMsgs = [
-      "カードデッキ構築型 RPG へようこそ！",
-      "探索操作: キーボードの矢印キー、WASD、または画面下のボタンで移動",
-      "戦闘システム: 敵を踏むとStSカードバトル突入。単語を綴ってカードを発動せよ！",
-      "Floor 5 の階段を降りればクリアです！ 生還を目指しましょう。"
-    ];
-    welcomeMsgs.forEach(msg => addLog(msg, 'system'));
+
   };
 
+  // Load first floor on mount
+  useEffect(() => {
+    startNewGame();
+  }, []);
   // Set up next floor
   const loadNextFloor = (nextFloorNum) => {
     setIsStoryLoading(true);
     setFloorStory(null);
-    generateFloorStory(nextFloorNum).then(data => {
-      setFloorStory(data.story);
-      roomDescriptionsRef.current = data.rooms || [];
-      visitedRoomsRef.current = new Set();
-      setIsStoryLoading(false);
-    });
+    setIsStoryLoading(false);
+    chattersPoolRef.current = [
+      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
+      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
+      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
+    ];
+    chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(nextFloorNum);
     setGrid(dungeon.grid);
@@ -1632,8 +2193,19 @@ function App() {
         playHitSound();
 
         const stateHelpers = {
-          dealDamage: (dmg) => {
-            let finalDmg = dmg + (nextPlayer.swordEquipped ? 2 : 0);
+          dealDamage: (dmg, target, options) => {
+            let baseDmg = dmg === 'block' ? nextBattle.playerBlock : dmg;
+            
+            // 筋力の適用
+            const strMulti = options?.strengthMultiplier || 1;
+            baseDmg += (nextBattle.playerStatus.strength || 0) * strMulti;
+
+            // 弱体化（Weak）の適用: ダメージ25%減少
+            if (nextBattle.playerStatus.weak > 0) {
+              baseDmg = Math.floor(baseDmg * 0.75);
+            }
+
+            let finalDmg = baseDmg;
             let enemyBlock = nextBattle.enemyBlock;
             let damageToHp = finalDmg;
             
@@ -1658,7 +2230,7 @@ function App() {
             stateHelpers.dealDamage(dmg);
           },
           gainBlock: (blk) => {
-            let finalBlk = blk + (nextPlayer.shieldEquipped ? 3 : 0);
+            let finalBlk = blk;
             nextBattle.playerBlock += finalBlk;
             addLog(`ブロックを ${finalBlk} えた。`, 'system');
           },
@@ -1666,12 +2238,35 @@ function App() {
             nextPlayer.hp = Math.min(nextPlayer.maxHp, nextPlayer.hp + amount);
             addLog(`HPが ${amount} かいふくした！`, 'level-up');
           },
-          applyStatus: () => {},
+          applyStatus: (target, type, amount) => {
+            if (type === 'poison') {
+              nextBattle.enemyStatus.poison = (nextBattle.enemyStatus.poison || 0) + amount;
+              addLog(`てきに ${amount} の「どく」をあたえた！`, 'system');
+            }
+          },
           applyStatusToAll: () => {},
           gainStrength: () => {},
           addTurnEndEffect: () => {},
           addPower: () => {},
-          drawCards: () => {},
+          drawCards: (count) => {
+            let drawn = 0;
+            for (let i = 0; i < count; i++) {
+              if (nextBattle.drawPile.length === 0) {
+                if (nextBattle.discardPile.length === 0) break;
+                nextBattle.drawPile = [...nextBattle.discardPile].sort(() => Math.random() - 0.5);
+                nextBattle.discardPile = [];
+                addLog('すてふだをシャッフルして、やまふだにもどした。', 'system');
+              }
+              const c = nextBattle.drawPile.pop();
+              if (c) {
+                nextBattle.hand.push(c);
+                drawn++;
+              }
+            }
+            if (drawn > 0) {
+              addLog(`カードを ${drawn} 枚ひいた！`, 'system');
+            }
+          },
           addCardToDiscard: () => {},
           triggerExhaust: () => {}
         };
@@ -1701,38 +2296,7 @@ function App() {
 
       // Check if enemy died
       if (nextBattle.enemy.hp <= 0) {
-        addLog(`${nextBattle.enemy.name} を倒した！`, 'level-up');
-        playVictorySound();
-        
-        const xpReward = nextBattle.enemy.xp;
-        const goldReward = nextBattle.enemy.gold;
-        nextPlayer.xp += xpReward;
-        nextPlayer.gold += goldReward;
-
-        if (nextPlayer.xp >= nextPlayer.xpNeeded) {
-          nextPlayer.level += 1;
-          nextPlayer.xp -= nextPlayer.xpNeeded;
-          nextPlayer.xpNeeded = Math.round(nextPlayer.xpNeeded * 1.5);
-          nextPlayer.maxHp += 8;
-          nextPlayer.hp = nextPlayer.maxHp;
-          nextPlayer.atk += 2;
-          nextPlayer.def += 1;
-          addLog(`レベルアップ！ レベル ${nextPlayer.level} になった！ (HP最大値+8、HP全回復)`, 'level-up');
-          playLevelUpSound();
-        }
-
-        const enemyX = nextBattle.enemy.x;
-        const enemyY = nextBattle.enemy.y;
-        const nextEnemies = enemies.filter(e => !(e.x === enemyX && e.y === enemyY));
-        setEnemies(nextEnemies);
-
-        setBattle(null);
-        setPlayer(nextPlayer);
-        setCardReward({
-          choices: getRandomRewardCards(nextPlayer.floor),
-          gold: goldReward,
-          xp: xpReward
-        });
+        handleEnemyDefeat(nextBattle.enemy, nextPlayer);
         setActiveQuiz(null);
         return;
       }
@@ -1783,8 +2347,11 @@ function App() {
       }
 
       let startingBlock = 0;
-      if (player.shieldEquipped) {
-        startingBlock = 3;
+      if (player.shieldLevel || player.shieldEquipped) {
+        startingBlock += (player.shieldLevel || 2) * 2;
+      }
+      if (player.relics && player.relics.some(r => r.key === 'iron_shield')) {
+        startingBlock += 5;
       }
 
       const initialBattle = {
@@ -1797,11 +2364,11 @@ function App() {
         hand: hand,
         discardPile: [],
         exhaustPile: [],
-        playerEnergy: 3,
-        playerMaxEnergy: 3,
+        playerEnergy: player.maxEnergy || 3,
+        playerMaxEnergy: player.maxEnergy || 3,
         playerBlock: startingBlock,
         playerStatus: {
-          strength: 0,
+          strength: ((player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0) + (player.swordLevel || (player.swordEquipped ? 2 : 0)),
           vulnerable: 0,
           weak: 0,
           barricade: 0,
@@ -1831,12 +2398,66 @@ function App() {
           const goldAmount = Math.floor(Math.random() * 16) + 15;
           nextPlayer.gold += goldAmount;
           addLog(`${item.name} を開けた！ ${goldAmount} ゴールドを獲得。`, 'item-pickup');
+        } else if (item.subType === 'shop') {
+          const shopItems = [];
+          const itemPool = ['potion', 'golden_apple', 'energy_crystal', 'magic_bag'];
+          const costs = { 'potion': 30, 'golden_apple': 75, 'energy_crystal': 150, 'magic_bag': 150 };
+          const names = { 'potion': 'ポーション', 'golden_apple': 'おうごんのリンゴ', 'energy_crystal': 'エネルギークリスタル', 'magic_bag': 'まほうのふくろ' };
+          
+          let selectedItemKey = itemPool[Math.floor(Math.random() * 2)];
+          if (nextPlayer.floor >= 3 && Math.random() < 0.3) {
+            selectedItemKey = itemPool[2 + Math.floor(Math.random() * 2)];
+          }
+          shopItems.push({ key: selectedItemKey, name: names[selectedItemKey], cost: costs[selectedItemKey] });
+          
+          const shopWeapons = [];
+          const curSwordLv = nextPlayer.swordLevel || (nextPlayer.swordEquipped ? 2 : 0);
+          const curShieldLv = nextPlayer.shieldLevel || (nextPlayer.shieldEquipped ? 2 : 0);
+          if (curSwordLv < 5) shopWeapons.push({ key: 'sword', name: `剣を強化(Lv.${curSwordLv+1})`, cost: 100 + curSwordLv * 50 });
+          if (curShieldLv < 5) shopWeapons.push({ key: 'shield', name: `盾を強化(Lv.${curShieldLv+1})`, cost: 100 + curShieldLv * 50 });
+
+          setShop({
+            cards: getRandomRewardCards(nextPlayer.floor),
+            items: shopItems,
+            weapons: shopWeapons,
+            removeCost: 50 + (nextPlayer.removedCount || 0) * 25,
+            removeMode: false
+          });
+          addLog('商人に出会った。', 'system');
         } else if (item.subType === 'sword') {
+          const curLv = nextPlayer.swordLevel || (nextPlayer.swordEquipped ? 2 : 0);
+          nextPlayer.swordLevel = curLv + 1;
           nextPlayer.swordEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(こうげきダメージが 2 ふえる！)`, 'item-pickup');
+          addLog(`遺物「${item.name}」を手に入れた！(剣Lv.${curLv+1} : 筋力+${curLv+1})`, 'item-pickup');
         } else if (item.subType === 'shield') {
+          const curLv = nextPlayer.shieldLevel || (nextPlayer.shieldEquipped ? 2 : 0);
+          nextPlayer.shieldLevel = curLv + 1;
           nextPlayer.shieldEquipped = true;
-          addLog(`遺物「${item.name}」を手に入れた！(ぼうぎょのブロックが 3 ふえる！)`, 'item-pickup');
+          addLog(`遺物「${item.name}」を手に入れた！(盾Lv.${curLv+1} : ブロック+${(curLv+1)*2})`, 'item-pickup');
+        } else if (item.subType === 'energy_crystal') {
+          nextPlayer.maxEnergy = (nextPlayer.maxEnergy || 3) + 1;
+          addLog(`「${item.name}」を拾った！さいだいエネルギーが 1 ふえた！`, 'level-up');
+        } else if (item.subType === 'magic_bag') {
+          nextPlayer.maxDraw = (nextPlayer.maxDraw || 3) + 1;
+          addLog(`「${item.name}」を拾った！まいターン引けるカードが 1 まい増えた！`, 'level-up');
+        } else if (item.subType === 'golden_apple') {
+          nextPlayer.maxHp += 10;
+          nextPlayer.hp += 10;
+          addLog(`「${item.name}」を食べた！さいだいHPが 10 ふえて、10 かいふくした！`, 'level-up');
+        } else if (item.subType === 'magic_book') {
+          const upgradableCards = nextPlayer.deck.filter(c => !c.upgraded);
+          if (upgradableCards.length > 0) {
+            const randomCard = upgradableCards[Math.floor(Math.random() * upgradableCards.length)];
+            const index = nextPlayer.deck.findIndex(c => c.id === randomCard.id);
+            if (index !== -1) {
+              const upgradedCard = createCardInstance(randomCard.key, true);
+              upgradedCard.id = randomCard.id;
+              nextPlayer.deck[index] = upgradedCard;
+              addLog(`「${item.name}」を読んだ！デッキの「${randomCard.name}」が強化された！`, 'level-up');
+            }
+          } else {
+            addLog(`「${item.name}」を見つけたが、これ以上強化できるカードがなかった。`, 'system');
+          }
         }
 
         nextItems.splice(itemIndex, 1);
@@ -1846,21 +2467,27 @@ function App() {
       nextPlayer.y = ty;
       playMoveSound();
 
+
+      if (Math.random() < 0.15) {
+        const sequence = chattersPoolRef.current;
+        if (chatterIndexRef.current < sequence.length) {
+          const nextChatter = sequence[chatterIndexRef.current];
+          setMapMessage(nextChatter);
+          addLog(`「${nextChatter}」`, 'system');
+          if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
+          mapMessageTimerRef.current = setTimeout(() => {
+            setMapMessage(null);
+          }, 4500);
+          chatterIndexRef.current++;
+        }
+      }
+
       // 新しい部屋に入ったかチェックして描写を出す
       const currentRoomIndex = rooms.findIndex(r => 
         tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h
       );
       if (currentRoomIndex !== -1 && !visitedRoomsRef.current.has(currentRoomIndex)) {
         visitedRoomsRef.current.add(currentRoomIndex);
-        if (roomDescriptionsRef.current.length > 0) {
-          const desc = roomDescriptionsRef.current.shift();
-          addLog(`【部屋】 ${desc}`, 'system');
-          setMapMessage(desc);
-          if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
-          mapMessageTimerRef.current = setTimeout(() => {
-            setMapMessage(null);
-          }, 4000);
-        }
       }
 
       if (targetTile.type === 'stairs') {
@@ -1963,47 +2590,306 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
+      if (gameOver) {
+        if (e.key === 'Enter') startNewGame();
+        return;
+      }
+      if (gameVictory) {
+        if (e.key === 'Enter') startNewGame();
+        return;
+      }
+      if (activeQuiz) return;
+      
+      if (battle) {
+        if (battle.battleLog.length > 0) {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+            e.preventDefault();
+            setBattle(prev => ({ ...prev, battleLog: [] }));
+          }
+          return;
+        }
 
+        const itemCount = battle.hand.length + 1;
+        let currentIdx = Math.min(battleFocusIndex, itemCount - 1);
+        let newIdx = currentIdx;
+
+        if (['ArrowLeft', 'ArrowUp', 'a', 'w', 'A', 'W'].includes(e.key)) {
+          e.preventDefault();
+          newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+        } else if (['ArrowRight', 'ArrowDown', 'd', 's', 'D', 'S'].includes(e.key)) {
+          e.preventDefault();
+          newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (currentIdx === battle.hand.length) {
+            handleEndTurn();
+          } else {
+            const card = battle.hand[currentIdx];
+            if (battle.playerEnergy >= card.cost) {
+              handleCardClick(card);
+            } else {
+              addLog(`エネルギーが足りない！`, 'system');
+            }
+          }
+          return;
+        } else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          handleEndTurn();
+          return;
+        } else if (e.key >= '1' && e.key <= '9') {
+          const idx = parseInt(e.key) - 1;
+          if (idx < battle.hand.length) {
+            e.preventDefault();
+            const card = battle.hand[idx];
+            if (battle.playerEnergy >= card.cost) {
+              handleCardClick(card);
+            } else {
+              addLog(`エネルギーが足りない！`, 'system');
+            }
+          }
+          return;
+        }
+        setBattleFocusIndex(newIdx);
+        return;
+      }
+      if (campsite) {
+        if (!campsite.showSmithDeck) {
+          let currentIdx = Math.min(campsiteActionFocusIndex, 1);
+          let newIdx = currentIdx;
+          if (['ArrowUp', 'ArrowLeft', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx === 0 ? 1 : 0;
+          } else if (['ArrowDown', 'ArrowRight', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault();
+            newIdx = currentIdx === 0 ? 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === 0) {
+              handleCampsiteRest();
+            } else {
+              setCampsite(prev => ({ ...prev, showSmithDeck: true }));
+              setCampsiteCardFocusIndex(0);
+            }
+            return;
+          }
+          setCampsiteActionFocusIndex(newIdx);
+        } else {
+          const itemCount = player.deck.length + 1; // deck + back button
+          let currentIdx = Math.min(campsiteCardFocusIndex, itemCount - 1);
+          let newIdx = currentIdx;
+
+          const N = player.deck.length;
+          if (['ArrowLeft', 'a', 'A'].includes(e.key)) {
+            e.preventDefault();
+            if (currentIdx !== N) {
+              newIdx = (currentIdx % 2 === 1) ? currentIdx - 1 : Math.min(currentIdx + 1, N - 1);
+            } else if (N > 0) {
+              newIdx = N - 1;
+            }
+          } else if (['ArrowRight', 'd', 'D'].includes(e.key)) {
+            e.preventDefault();
+            if (currentIdx !== N) {
+              newIdx = (currentIdx % 2 === 0) ? Math.min(currentIdx + 1, N - 1) : currentIdx - 1;
+            } else if (N > 0) {
+              newIdx = 0;
+            }
+          } else if (['ArrowUp', 'w', 'W'].includes(e.key)) {
+            e.preventDefault();
+            if (currentIdx === N) newIdx = N > 0 ? N - 1 : N;
+            else if (currentIdx < 2) newIdx = N;
+            else newIdx = currentIdx - 2;
+          } else if (['ArrowDown', 's', 'S'].includes(e.key)) {
+            e.preventDefault();
+            if (currentIdx === N) newIdx = N > 0 ? 0 : N;
+            else if (currentIdx + 2 < N) newIdx = currentIdx + 2;
+            else newIdx = N;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === player.deck.length) {
+              setCampsite(prev => ({ ...prev, showSmithDeck: false }));
+            } else {
+              const card = player.deck[currentIdx];
+              if (!card.upgraded) {
+                handleCampsiteUpgrade(card);
+              }
+            }
+            return;
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setCampsite(prev => ({ ...prev, showSmithDeck: false }));
+            return;
+          }
+          setCampsiteCardFocusIndex(newIdx);
+        }
+        return;
+      }
+      if (cardReward) {
+        const itemCount = cardReward.choices.length + 1; // cards + skip button
+        let currentIdx = Math.min(cardRewardFocusIndex, itemCount - 1);
+        let newIdx = currentIdx;
+
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (currentIdx === cardReward.choices.length) {
+            addLog((isStealthMode ? 'カードスキップ。' : '🏃‍♂️ カードスキップ。'), 'system');
+            setCardReward(null);
+          } else {
+            const card = cardReward.choices[currentIdx];
+            setPlayer(prev => ({ ...prev, deck: [...prev.deck, card] }));
+            addLog(`${isStealthMode ? '' : '🎉 '}デッキに「${card.name}」追加。`, 'system');
+            setCardReward(null);
+            setShop(null);
+          }
+          return;
+        } else if (e.key >= '1' && e.key <= '3') {
+          const idx = parseInt(e.key) - 1;
+          if (idx < cardReward.choices.length) {
+            e.preventDefault();
+            const card = cardReward.choices[idx];
+            setPlayer(prev => ({ ...prev, deck: [...prev.deck, card] }));
+            addLog(`${isStealthMode ? '' : '🎉 '}デッキに「${card.name}」追加。`, 'system');
+            setCardReward(null);
+            setShop(null);
+          }
+          return;
+        }
+        
+        setCardRewardFocusIndex(newIdx);
+        return;
+      }
+
+      if (shop) {
+        if (shop.removeMode) {
+          const itemCount = player.deck.length + 1; // deck + cancel
+          let currentIdx = Math.min(shopFocusIndex, itemCount - 1);
+          let newIdx = currentIdx;
+
+          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx > 0 ? currentIdx - 1 : itemCount - 1;
+          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx < itemCount - 1 ? currentIdx + 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (currentIdx === player.deck.length) {
+              setShop(prev => ({ ...prev, removeMode: false }));
+              setShopFocusIndex(0);
+            } else {
+              handleShopRemoveCardSelect(currentIdx);
+            }
+            return;
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setShop(prev => ({ ...prev, removeMode: false }));
+            setShopFocusIndex(0);
+            return;
+          }
+          setShopFocusIndex(newIdx);
+        } else {
+          const buyableCount = (shop.cards ? shop.cards.length : 0) 
+                             + (shop.items ? shop.items.length : 0) 
+                             + (shop.weapons ? shop.weapons.length : 0) 
+                             + 3; // Heal, Remove, Leave
+          let currentIdx = Math.min(shopFocusIndex, buyableCount - 1);
+          let newIdx = currentIdx;
+          
+          if (['ArrowLeft', 'ArrowUp', 'w', 'a', 'W', 'A'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx > 0 ? currentIdx - 1 : buyableCount - 1;
+          } else if (['ArrowRight', 'ArrowDown', 's', 'd', 'S', 'D'].includes(e.key)) {
+            e.preventDefault(); newIdx = currentIdx < buyableCount - 1 ? currentIdx + 1 : 0;
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            
+            let tempIdx = 0;
+            let actionDone = false;
+            
+            // Cards
+            if (shop.cards && !actionDone) {
+              for (let i=0; i<shop.cards.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyCard(shop.cards[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Items
+            if (shop.items && !actionDone) {
+              for (let i=0; i<shop.items.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyItem(shop.items[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Weapons
+            if (shop.weapons && !actionDone) {
+              for (let i=0; i<shop.weapons.length; i++) {
+                if (tempIdx === currentIdx) { handleShopBuyWeapon(shop.weapons[i]); actionDone = true; break; }
+                tempIdx++;
+              }
+            }
+            
+            // Heal
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { handleShopHeal(); actionDone = true; }
+              tempIdx++;
+            }
+            
+            // Remove
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { 
+                if (player.gold >= shop.removeCost && player.deck.length > 1) {
+                  setShop(prev => ({ ...prev, removeMode: true })); 
+                  setShopFocusIndex(0);
+                } else {
+                  addLog('ゴールドが足りないか、削除できるカードがありません。', 'system');
+                }
+                actionDone = true;
+              }
+              tempIdx++;
+            }
+            
+            // Leave
+            if (!actionDone) {
+              if (tempIdx === currentIdx) { handleShopLeave(); }
+            }
+          }
+          setShopFocusIndex(newIdx);
+        }
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastMoveTimeRef.current < 120) {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', ' '].includes(e.key)) {
+          e.preventDefault();
+        }
+        return;
+      }
+
+      let moved = false;
       switch(e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-          e.preventDefault();
-          handleMove(0, -1);
-          break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-          e.preventDefault();
-          handleMove(0, 1);
-          break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-          e.preventDefault();
-          handleMove(-1, 0);
-          break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-          e.preventDefault();
-          handleMove(1, 0);
-          break;
-        case ' ':
-          e.preventDefault();
-          handleWait();
-          break;
-        default:
-          break;
+        case 'ArrowUp': case 'w': case 'W': e.preventDefault(); handleMove(0, -1); moved = true; break;
+        case 'ArrowDown': case 's': case 'S': e.preventDefault(); handleMove(0, 1); moved = true; break;
+        case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
+        case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
+        case ' ': e.preventDefault(); handleWait(); moved = true; break;
+        default: break;
+      }
+
+      if (moved) {
+        lastMoveTimeRef.current = now;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex]);
 
-  const VIEWPORT_RADIUS = 10;
+  const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
   
   if (grid.length > 0) {
@@ -2047,7 +2933,7 @@ function App() {
   }
 
   return (
-    <div className={`app-container retro-theme ${screenShake ? 'shake-effect flash-damage' : ''}`}>
+    <div className={`app-container retro-theme ${isStealthMode ? 'stealth-theme' : ''} ${screenShake ? 'shake-effect flash-damage' : ''}`}>
       <header className="app-header">
         <div className="header-left">
           <h1>ROGUE-TEXT RPG</h1>
@@ -2060,43 +2946,43 @@ function App() {
               className={`control-btn ${windows.map.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('map')}
             >
-              🗺️ MAP & BATTLE
+              {isStealthMode ? '' : '🗺️ '}MAP & BATTLE
             </button>
             <button 
               className={`control-btn ${windows.status.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('status')}
             >
-              📊 STATUS
+              {isStealthMode ? '' : '📊 '}STATUS
             </button>
             <button 
               className={`control-btn ${windows.logs.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('logs')}
             >
-              📜 LOGS
+              {isStealthMode ? '' : '📜 '}LOGS
             </button>
             <button 
               className={`control-btn ${windows.legend.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('legend')}
             >
-              🔑 LEGEND
+              {isStealthMode ? '' : '🔑 '}LEGEND
             </button>
             <button 
               className={`control-btn ${windows.wordlist.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('wordlist')}
             >
-              📖 DECK & WORDS ({Object.keys(learnedWords).length})
+              {isStealthMode ? '' : '📖 '}DECK & WORDS ({Object.keys(learnedWords).length})
             </button>
             <button 
               className={`control-btn ${windows.settings?.visible ? 'active' : ''}`}
               onClick={() => toggleWindow('settings')}
             >
-              ⚙️ SETTINGS
+              {isStealthMode ? '' : '⚙️ '}SETTINGS
             </button>
             <button 
               className="control-btn reset-layout-btn"
               onClick={resetWindows}
             >
-              🔄 RESET
+              {isStealthMode ? '' : '🔄 '}RESET
             </button>
           </div>
         ) : (
@@ -2106,14 +2992,14 @@ function App() {
               className={`panel-tab-btn ${rightTab === 'status' ? 'active' : ''}`}
               onClick={() => setRightTab('status')}
             >
-              📊 プレイ画面
+              {isStealthMode ? '' : '📊 '}プレイ画面
             </button>
             <button 
               type="button"
               className={`panel-tab-btn ${rightTab === 'wordlist' ? 'active' : ''}`}
               onClick={() => setRightTab('wordlist')}
             >
-              📖 デッキ & 単語 ({Object.keys(learnedWords).length})
+              {isStealthMode ? '' : '📖 '}デッキ & 単語 ({Object.keys(learnedWords).length})
             </button>
           </div>
         )}
@@ -2136,27 +3022,7 @@ function App() {
         )}
       </main>
 
-      { (isStoryLoading || floorStory) && !gameOver && !gameVictory && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-          <div style={{ background: '#18181b', border: '1px solid #ff3e3e', padding: '30px', borderRadius: '10px', maxWidth: '500px', color: '#f3f4f6', textAlign: 'center', boxShadow: '0 0 20px rgba(255, 62, 62, 0.3)' }}>
-            <h2 style={{ color: '#ff3e3e', marginBottom: '20px' }}>第 {player.floor} 階層</h2>
-            <div style={{ minHeight: '100px', marginBottom: '20px', fontSize: '1.1rem', lineHeight: '1.6' }}>
-              {isStoryLoading ? (
-                <span style={{ color: '#a1a1aa', fontStyle: 'italic' }}>Geminiがストーリーを生成中...<br/>(APIキー未設定の場合はすぐに終わります)</span>
-              ) : (
-                floorStory
-              )}
-            </div>
-            <button
-              onClick={() => setFloorStory(null)}
-              disabled={isStoryLoading}
-              style={{ padding: '10px 30px', fontSize: '1.1rem', background: isStoryLoading ? '#3f3f46' : '#ff3e3e', color: '#fff', border: 'none', borderRadius: '5px', cursor: isStoryLoading ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
-            >
-              探索を開始する
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Game Over Screen */}
       {gameOver && (
@@ -2187,6 +3053,13 @@ function App() {
           </button>
         </div>
       )}
+      {/* Debug Info */}
+      <div style={{ position: 'fixed', bottom: 5, right: 5, fontSize: '10px', color: '#fff', background: 'rgba(0,0,0,0.7)', padding: '4px', zIndex: 9999 }}>
+        Questions: {getCustomQuestions().length > 0 ? `Custom (${getCustomQuestions().length})` : 'Default'} 
+        | Loaded: {QUESTIONS_DB.length}
+        | Exps: {QUESTIONS_DB.filter(q => q.explanation).length}
+      </div>
+
     </div>
   );
 }

@@ -1,5 +1,6 @@
 // 学習記録（正答率・回答日）を管理するユーティリティ
 import { QUESTIONS_DB, getCustomQuestions } from './questions';
+import { syncAllToCloud } from './sync';
 
 const STATS_KEY = 'learning_rpg_stats';
 
@@ -37,6 +38,11 @@ export const recordAnswer = (questionId, isCorrect) => {
   stats[questionId].lastAnswered = new Date().toISOString();
   
   saveStats(stats);
+  
+  // クラウド同期キーがあれば裏側で送信する（awaitはしない）
+  if (localStorage.getItem('learning_rpg_sync_token')) {
+    syncAllToCloud().catch(e => console.error('Auto sync failed', e));
+  }
 };
 
 export const getStatsForQuestion = (questionId) => {

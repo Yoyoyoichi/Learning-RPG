@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import Papa from 'papaparse';
+import { useState } from 'react';
 import './WordListPanel.css';
 
 const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, onClearCustomWords, deck = [] }) => {
@@ -7,81 +6,11 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
   const [filter, setFilter] = useState('all'); // 'all', 'review', 'correct'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Handle CSV file upload
+  // Handle CSV file upload by passing to parent
   const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        let parsed = [];
-        if (results.data && results.data.length > 0) {
-          const firstRow = results.data[0];
-          const keys = Object.keys(firstRow);
-          
-          // Identify keys dynamically
-          const englishKey = keys.find(k => 
-            k.toLowerCase().includes('word') || 
-            k.toLowerCase().includes('english') || 
-            k.toLowerCase() === 'en' || 
-            k.toLowerCase() === 'eng'
-          );
-          
-          const japaneseKey = keys.find(k => 
-            k.toLowerCase().includes('meaning') || 
-            k.toLowerCase().includes('japanese') || 
-            k.toLowerCase() === 'ja' || 
-            k.toLowerCase() === 'jp' || 
-            k.toLowerCase() === 'jpn'
-          );
-
-          if (englishKey && japaneseKey) {
-            parsed = results.data.map(row => ({
-              word: row[englishKey] ? row[englishKey].trim() : '',
-              meaning: row[japaneseKey] ? row[japaneseKey].trim() : ''
-            })).filter(r => r.word && r.meaning);
-          }
-        }
-
-        if (parsed.length > 0) {
-          onImportCustomWords(parsed);
-          e.target.value = ''; // Reset file input
-        } else {
-          // If header-based parsing yields nothing, fallback to parsing without headers (index-based)
-          parseHeaderless(file, e);
-        }
-      },
-      error: (err) => {
-        alert("ファイルのロードに失敗しました: " + err.message);
-      }
-    });
-  };
-
-  const parseHeaderless = (file, e) => {
-    Papa.parse(file, {
-      header: false,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const parsed = results.data.map(row => {
-          if (row.length >= 2) {
-            return {
-              word: row[0] ? row[0].trim() : '',
-              meaning: row[1] ? row[1].trim() : ''
-            };
-          }
-          return null;
-        }).filter(r => r && r.word && r.meaning);
-
-        if (parsed.length > 0) {
-          onImportCustomWords(parsed);
-        } else {
-          alert("CSVファイルの読み込みに失敗しました。英語と日本語の2列で構成されているか、ヘッダーに 'word' と 'meaning' を指定してください。");
-        }
-        e.target.value = ''; // Reset input
-      }
-    });
+    if (onImportCustomWords) {
+      onImportCustomWords(e);
+    }
   };
 
   // Convert map/object of learned words to array for filtering & listing
@@ -110,8 +39,6 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
   });
 
   // Calculate statistics
-  const totalEncountered = wordsArray.length;
-  const totalCorrect = wordsArray.reduce((acc, curr) => acc + (curr.correctCount > 0 ? 1 : 0), 0);
   const totalReview = wordsArray.filter(w => w.isReview).length;
 
   return (
@@ -123,10 +50,10 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
           onClick={() => setActiveTab('words')}
           style={{
             flex: 1,
-            background: activeTab === 'words' ? '#18181b' : 'transparent',
+            background: activeTab === 'words' ? '#f3f4f6' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'words' ? '2px solid #00ff66' : 'none',
-            color: activeTab === 'words' ? '#00ff66' : '#a1a1aa',
+            borderBottom: activeTab === 'words' ? '2px solid #059669' : 'none',
+            color: activeTab === 'words' ? '#059669' : '#4b5563',
             padding: '8px',
             cursor: 'pointer',
             fontSize: '0.85rem',
@@ -140,10 +67,10 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
           onClick={() => setActiveTab('deck')}
           style={{
             flex: 1,
-            background: activeTab === 'deck' ? '#18181b' : 'transparent',
+            background: activeTab === 'deck' ? '#f3f4f6' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'deck' ? '2px solid #ff3e3e' : 'none',
-            color: activeTab === 'deck' ? '#ff3e3e' : '#a1a1aa',
+            borderBottom: activeTab === 'deck' ? '2px solid #dc2626' : 'none',
+            color: activeTab === 'deck' ? '#dc2626' : '#4b5563',
             padding: '8px',
             cursor: 'pointer',
             fontSize: '0.85rem',
@@ -264,7 +191,7 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
                     border: `1px solid ${borderCol}`,
                     borderRadius: '6px',
                     padding: '8px',
-                    background: '#09090b',
+                    background: '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -276,7 +203,7 @@ const WordListPanel = ({ learnedWords, customWordsCount, onImportCustomWords, on
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ 
                         fontWeight: 'bold', 
-                        color: card.type === 'attack' ? '#fca5a5' : '#93c5fd',
+                        color: card.type === 'attack' ? '#dc2626' : '#0284c7',
                         fontSize: '0.78rem'
                       }}>
                         {card.name}
