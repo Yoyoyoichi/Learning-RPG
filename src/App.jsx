@@ -4,7 +4,7 @@ import TileMap from './components/TileMap';
 import QuizOverlay from './components/QuizOverlay';
 import WordListPanel from './components/WordListPanel';
 import { getRandomQuestion, setDefaultQuestions, getCustomQuestions, QUESTIONS_DB } from './utils/questions';
-import { generateFloorStory } from './utils/gemini';
+import { generateFloorStory, generateGameStateComment } from './utils/gemini';
 import Papa from 'papaparse';
 import { exportStatsToCSV } from './utils/stats';
 import { syncAllToCloud, syncAllFromCloud } from './utils/sync';
@@ -351,6 +351,7 @@ function App() {
   const mapMessageTimerRef = useRef(null);
   const lastMoveTimeRef = useRef(0);
   const [mapMessage, setMapMessage] = useState(null);
+  const [aiComment, setAiComment] = useState(null);
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
@@ -2090,11 +2091,7 @@ function App() {
     setIsStoryLoading(true);
     setFloorStory(null);
     setIsStoryLoading(false);
-    chattersPoolRef.current = [
-      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-    ];
+    chattersPoolRef.current = [];
     chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(1);
@@ -2128,11 +2125,7 @@ function App() {
     setIsStoryLoading(true);
     setFloorStory(null);
     setIsStoryLoading(false);
-    chattersPoolRef.current = [
-      "また一つ、無意味な正解を重ねてしまったか。……今日の夕飯なんだろう。",
-      "静寂だ。私の思考の騒音と、お腹の鳴る音だけが響いている。",
-      "進むべき道など、最初から無かったのかもしれないな。……とりあえず右に行こ。"
-    ];
+    chattersPoolRef.current = [];
     chatterIndexRef.current = 0;
 
     const dungeon = generateDungeon(nextFloorNum);
@@ -2306,6 +2299,35 @@ function App() {
   };
 
   // Turn logic execution (Synchronous State Resolution)
+
+  const triggerAIComment = async () => {
+    if (aiComment) return;
+
+    const gameState = {
+      hp: player.hp,
+      maxHp: player.maxHp,
+      floor: player.floor,
+      inBattle: !!battle,
+      enemyName: battle ? battle.enemy.name : null,
+      enemyHp: battle ? battle.enemy.hp : null
+    };
+
+    setAiComment({ loading: true });
+    const result = await generateGameStateComment(gameState);
+    
+    if (result && result.comment) {
+      setAiComment({ text: result.comment, loading: false });
+      addLog(`🧙‍♂️ 先生: ${result.comment}`, 'system');
+      
+      if (mapMessageTimerRef.current) clearTimeout(mapMessageTimerRef.current);
+      mapMessageTimerRef.current = setTimeout(() => {
+        setAiComment(null);
+      }, 5000);
+    } else {
+      setAiComment(null);
+    }
+  };
+
   const handleMove = (dx, dy) => {
     if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
 
@@ -2874,6 +2896,7 @@ function App() {
         case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); handleMove(-1, 0); moved = true; break;
         case 'ArrowRight': case 'd': case 'D': e.preventDefault(); handleMove(1, 0); moved = true; break;
         case ' ': e.preventDefault(); handleWait(); moved = true; break;
+        case 'c': case 'C': e.preventDefault(); triggerAIComment(); break;
         default: break;
       }
 
@@ -2884,7 +2907,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex]);
+  }, [player, grid, rooms, enemies, items, gameOver, gameVictory, activeQuiz, battle, campsite, cardReward, isStoryLoading, floorStory, battleFocusIndex, cardRewardFocusIndex, campsiteActionFocusIndex, campsiteCardFocusIndex, shop, shopFocusIndex, aiComment]);
 
   const VIEWPORT_RADIUS = 15;
   const renderGrid = [];
@@ -3056,7 +3079,55 @@ function App() {
         | Loaded: {QUESTIONS_DB.length}
         | Exps: {QUESTIONS_DB.filter(q => q.explanation).length}
       </div>
+      {/* Global AI Comment Overlay */}
+      {aiComment && !aiComment.loading && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'rgba(59, 130, 246, 0.95)',
+          border: '2px solid #2563eb',
+          color: '#ffffff',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          maxWidth: '280px',
+          fontSize: '0.85rem',
+          lineHeight: '1.4',
+          zIndex: 1000,
+          pointerEvents: 'none'
+        }}>
+          <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生</strong>
+          {aiComment.text}
+        </div>
+      )}
 
+      {/* Manual AI Comment Trigger Button */}
+      {!activeQuiz && !gameOver && !gameVictory && (
+        <button
+          onClick={triggerAIComment}
+          disabled={aiComment && aiComment.loading}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#3b82f6',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '10px 16px',
+            fontSize: '0.85rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            zIndex: 900,
+            transition: 'background 0.2s',
+            opacity: (aiComment && aiComment.loading) ? 0.6 : 1
+          }}
+        >
+          {aiComment && aiComment.loading ? '⏳ 考え中...' : '💡 先生に相談'}
+        </button>
+      )}
     </div>
   );
 }

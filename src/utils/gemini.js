@@ -70,13 +70,16 @@ export const generateFloorStory = async (floorNumber) => {
 
 export const generateQuizFeedback = async (question, answer, userAnswer, isCorrect, enemyName) => {
   if (!genAI) {
-    return null;
+    return { tutorExplanation: 'APIキーが設定されていません' };
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-lite-latest",
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-    const prompt = `あなたはファンタジーRPGの専属AI家庭教師であり、同時に敵モンスター（${enemyName}）の役割も演じます。
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師です。
 以下のクイズに対して、プレイヤーが回答しました。
 
 問題: ${question}
@@ -84,14 +87,12 @@ export const generateQuizFeedback = async (question, answer, userAnswer, isCorre
 プレイヤーの回答: ${userAnswer}
 判定: ${isCorrect ? '正解' : '不正解'}
 
-以下の2つの情報をJSONフォーマットで出力してください。
-1. "tutorExplanation": 不正解の場合は、なぜ間違えたのかを推測し、優しい魔法使いのような口調で解き方を教えてください。正解の場合は、「お見事です！」のような短い称賛の言葉をください。（100文字程度）
-2. "enemyReaction": 敵（${enemyName}）のリアクション。正解されたら悔しがり、不正解ならクイズの内容に絡めて煽ってください。（50文字程度）
+以下の情報をJSONフォーマットで出力してください。
+"tutorExplanation": 不正解の場合は、なぜ間違えたのかを推測し、優しい魔法使いのような口調で解き方を教えてください。正解の場合は、「お見事です！」のような短い称賛の言葉をください。（100文字程度）
 
 必ず以下のようなJSONのみを出力してください（マークダウンのバッククォートなどは含めないこと）。
 {
-  "tutorExplanation": "...",
-  "enemyReaction": "..."
+  "tutorExplanation": "..."
 }`;
 
     const timeoutPromise = new Promise((_, reject) =>
@@ -111,6 +112,55 @@ export const generateQuizFeedback = async (question, answer, userAnswer, isCorre
     return JSON.parse(text);
   } catch (error) {
     console.error("Gemini API Feedback Error:", error);
+    return {
+      tutorExplanation: `APIエラー: ${error.message || error}`
+    };
+  }
+};
+
+export const generateGameStateComment = async (gameState) => {
+  if (!genAI) return null;
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-lite-latest",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師です。
+現在、プレイヤーは以下の状況に置かれています。
+
+【ゲーム状況】
+階層: 第${gameState.floor}階層
+プレイヤーHP: ${gameState.hp} / ${gameState.maxHp}
+${gameState.inBattle ? `戦闘中: 敵「${gameState.enemyName}」 (HP: ${gameState.enemyHp})` : '探索中（戦闘は発生していません）'}
+${gameState.recentQuestion ? `直近のクイズ問題: ${gameState.recentQuestion.question} (正解: ${gameState.recentQuestion.answer})` : ''}
+
+上記の状況を踏まえて、プレイヤーを応援する、またはメタ的なツッコミを入れるアドバイスを1つ生成してください。（50文字以内）
+※絶対にネガティブな発言や、皮肉、プレイヤーを貶めるような発言はしないでください。明るく優しい口調にしてください。
+
+以下の情報をJSONフォーマットで出力してください。
+{
+  "comment": "..."
+}`;
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    const response = await result.response;
+    let text = response.text().trim();
+    if (text.startsWith('\`\`\`')) {
+      text = text.replace(/^\`\`\`(json)?/, '').replace(/\`\`\`$/, '').trim();
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API GameState Comment Error:", error);
     return null;
   }
 };
