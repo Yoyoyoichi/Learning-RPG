@@ -193,7 +193,7 @@ const ChoiceQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
 
           {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '0.75rem', color: '#bfdbfe' }}>
+              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '1.1rem', color: '#bfdbfe' }}>
                 <strong style={{ color: '#60a5fa' }}>🧙‍♂️ AI先生:</strong> {aiFeedback.tutorExplanation}
               </div>
             </div>
@@ -409,7 +409,7 @@ const InputQuiz = ({ questionObj, onCorrect, onIncorrect, enemyName }) => {
 
           {aiFeedback && !aiFeedback.loading && !aiFeedback.failed && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '0.75rem', color: '#bfdbfe' }}>
+              <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '6px', border: '1px solid #3b82f6', fontSize: '1.1rem', color: '#bfdbfe' }}>
                 <strong style={{ color: '#60a5fa' }}>🧙‍♂️ AI先生:</strong> {aiFeedback.tutorExplanation}
               </div>
             </div>
