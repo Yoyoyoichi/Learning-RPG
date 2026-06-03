@@ -2440,9 +2440,25 @@ function App() {
           nextPlayer.hp = Math.min(nextPlayer.maxHp, nextPlayer.hp + recoverAmount);
           addLog(`${item.name} を拾って使用した。HP が ${recoverAmount} 回復した。`, 'item-pickup');
         } else if (item.subType === 'chest') {
-          const goldAmount = Math.floor(Math.random() * 16) + 15;
-          nextPlayer.gold += goldAmount;
-          addLog(`${item.name} を開けた！ ${goldAmount} ゴールドを獲得。`, 'item-pickup');
+          const r = Math.random();
+          if (r < 0.25) {
+            nextPlayer.swordEquipped = true;
+            nextPlayer.swordLevel = (nextPlayer.swordLevel || 0) + 1;
+            nextPlayer.atk += 2;
+            addLog(`${item.name}を開けた！ 「業物の剣」が入っていた！ (攻撃力+2)`, 'item-pickup');
+          } else if (r < 0.50) {
+            nextPlayer.shieldEquipped = true;
+            nextPlayer.shieldLevel = (nextPlayer.shieldLevel || 0) + 1;
+            nextPlayer.def += 1;
+            addLog(`${item.name}を開けた！ 「頑丈な盾」が入っていた！ (防御力+1)`, 'item-pickup');
+          } else if (r < 0.75) {
+            setCardReward({ choices: getRandomRewardCards(nextPlayer.floor), gold: 0, xp: 0 });
+            addLog(`${item.name}を開けた！ 未知のカードが眠っていた！`, 'item-pickup');
+          } else {
+            const goldAmount = Math.floor(Math.random() * 51) + 50; // 50~100G
+            nextPlayer.gold += goldAmount;
+            addLog(`${item.name}を開けた！ 大量の金貨を見つけた！ (${goldAmount} G)`, 'item-pickup');
+          }
         } else if (item.subType === 'shop') {
           const shopItems = [];
           const itemPool = ['potion', 'golden_apple', 'energy_crystal', 'magic_bag'];
