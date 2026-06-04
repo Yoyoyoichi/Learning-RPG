@@ -389,6 +389,65 @@ function App() {
     addLog('設定を保存しました。', 'system');
   };
   const [aiComment, setAiComment] = useState(null);
+  const [aiPos, setAiPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('learning_rpg_ai_pos');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return { x: typeof window !== 'undefined' ? window.innerWidth - 320 : 20, y: 20 };
+  });
+  const aiDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+  useEffect(() => {
+    const handleMove = (e) => {
+      if (!aiDragRef.current.isDragging) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const dx = clientX - aiDragRef.current.startX;
+      const dy = clientY - aiDragRef.current.startY;
+      setAiPos({
+        x: aiDragRef.current.initialX + dx,
+        y: aiDragRef.current.initialY + dy
+      });
+    };
+    const handleUp = () => {
+      if (aiDragRef.current.isDragging) {
+        aiDragRef.current.isDragging = false;
+        // Save to localStorage using the latest state (we can just use functional state update trick or just save the ref)
+        // Actually, to get latest state in event listener safely, we can just save inside handleUp if we rebind, or use a ref for current pos.
+        // But since we re-bind on aiPos change, we have the latest aiPos.
+      }
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [aiPos]);
+
+  useEffect(() => {
+    if (!aiDragRef.current.isDragging) {
+      localStorage.setItem('learning_rpg_ai_pos', JSON.stringify(aiPos));
+    }
+  }, [aiPos]);
+
+  const handleAiDragStart = (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    aiDragRef.current = {
+      isDragging: true,
+      startX: clientX,
+      startY: clientY,
+      initialX: aiPos.x,
+      initialY: aiPos.y
+    };
+  };
+
   const [isEnemyTurn, setIsEnemyTurn] = useState(false);
   const [enemyActionText, setEnemyActionText] = useState("");
   const [screenShake, setScreenShake] = useState(false);
@@ -3221,10 +3280,13 @@ function App() {
       </div>
       {/* Global AI Comment Overlay */}
       {aiComment && !aiComment.loading && (
-        <div style={{
+        <div 
+          onMouseDown={handleAiDragStart}
+          onTouchStart={handleAiDragStart}
+          style={{
           position: 'fixed',
-          top: '20px',
-          right: '20px',
+          top: `${aiPos.y}px`,
+          left: `${aiPos.x}px`,
           background: 'rgba(59, 130, 246, 0.95)',
           border: '2px solid #2563eb',
           color: '#ffffff',
@@ -3235,9 +3297,11 @@ function App() {
           fontSize: '0.85rem',
           lineHeight: '1.4',
           zIndex: 1000,
-          pointerEvents: 'none'
+          pointerEvents: 'auto',
+          cursor: 'move',
+          userSelect: 'none'
         }}>
-          <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '4px' }}>🧙‍♂️ AI先生</strong>
+          <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '4px', cursor: 'move' }}>🧙‍♂️ AI先生</strong>
           {aiComment.text}
         </div>
       )}
