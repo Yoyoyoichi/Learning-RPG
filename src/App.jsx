@@ -123,12 +123,12 @@ const generateDungeon = (floor) => {
   const enemyTypes = [
     { subType: 'slime', char: 's', name: 'スライム', hp: 5, atk: 5, def: 0, xp: 4, gold: 3 },
     { subType: 'bat', char: 'b', name: 'コウモリ', hp: 6, atk: 6, def: 0, xp: 5, gold: 4 },
-    { subType: 'skeleton', char: 'S', name: 'スケルトン', hp: 14, atk: 9, def: 2, xp: 12, gold: 8 },
-    { subType: 'ghost', char: 'G', name: 'ゴースト', hp: 20, atk: 8, def: 3, xp: 25, gold: 13 },
-    { subType: 'werewolf', char: 'w', name: 'ウェアウルフ', hp: 35, atk: 12, def: 2, xp: 40, gold: 20 },
-    { subType: 'vampire', char: 'V', name: 'ヴァンパイア', hp: 45, atk: 14, def: 4, xp: 55, gold: 30 },
-    { subType: 'demon', char: 'd', name: 'デーモン', hp: 60, atk: 18, def: 5, xp: 80, gold: 45 },
-    { subType: 'dragon', char: 'D', name: 'ドラゴン', hp: 100, atk: 25, def: 8, xp: 150, gold: 80 }
+    { subType: 'skeleton', char: 'S', name: 'スケルトン', hp: 7, atk: 4, def: 1, xp: 12, gold: 8 },
+    { subType: 'ghost', char: 'G', name: 'ゴースト', hp: 10, atk: 4, def: 1, xp: 25, gold: 13 },
+    { subType: 'werewolf', char: 'w', name: 'ウェアウルフ', hp: 18, atk: 6, def: 1, xp: 40, gold: 20 },
+    { subType: 'vampire', char: 'V', name: 'ヴァンパイア', hp: 22, atk: 7, def: 2, xp: 55, gold: 30 },
+    { subType: 'demon', char: 'd', name: 'デーモン', hp: 30, atk: 9, def: 2, xp: 80, gold: 45 },
+    { subType: 'dragon', char: 'D', name: 'ドラゴン', hp: 50, atk: 12, def: 4, xp: 150, gold: 80 }
   ];
 
   // Limit enemy pool depending on floor difficulty
