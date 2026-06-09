@@ -991,13 +991,46 @@ function App() {
     if (!battle) return null;
     const { enemy, enemyBlock, enemyIntent, turn, playerEnergy, playerBlock, hand } = battle;
 
+    const renderAscii = (text) => (
+      <pre style={{ 
+        fontFamily: 'monospace', 
+        fontSize: '0.8rem', 
+        lineHeight: '1.2',
+        margin: '0',
+        padding: '0',
+        whiteSpace: 'pre',
+        textAlign: 'center',
+        color: '#d1d5db'
+      }}>
+        {text}
+      </pre>
+    );
+
     const getEnemySprite = (subType) => {
-      switch(subType) {
-        case 'slime': return (isStealthMode ? 'Slime' : '🟢');
-        case 'bat': return (isStealthMode ? 'Bat' : '🦇');
-        case 'skeleton': return (isStealthMode ? 'Skeleton' : '💀');
-        case 'ghost': return (isStealthMode ? 'Ghost' : '👻');
-        default: return (isStealthMode ? 'Enemy' : '👾');
+      if (isStealthMode) {
+        switch(subType) {
+          case 'slime': return 'Slime';
+          case 'bat': return 'Bat';
+          case 'skeleton': return 'Skeleton';
+          case 'ghost': return 'Ghost';
+          case 'werewolf': return 'Werewolf';
+          case 'vampire': return 'Vampire';
+          case 'demon': return 'Demon';
+          case 'dragon': return 'Dragon';
+          default: return 'Enemy';
+        }
+      } else {
+        switch(subType) {
+          case 'slime': return renderAscii("      _..._\n    .'     '.\n   /  O   O  \\\n  |   .___    |\n   \\         /\n    `'-----'`");
+          case 'bat': return renderAscii(" ^\\/\\^       ^/\\/^\n   \\  \\  V  /  /\n    \\  \\(_)/  /\n     \\  / \\  /\n      \\/   \\/");
+          case 'skeleton': return renderAscii("      .-\.\n     (o o)\n     | O |\n     \\   /\n     |   |\n    /|\\ /|\\\n   / | V | \\");
+          case 'ghost': return renderAscii("     .----.\n   .'      '.\n  /  O    O  \\\n  |    __    |\n  \\  `~  ~`  /\n   '.___.''.__");
+          case 'werewolf': return renderAscii("      /\\_/\\\n     / o o \\\n    (   \"   )\n     \\~---~/\n     /     \\\n   _/       \\_");
+          case 'vampire': return renderAscii("    /^\\_-_/^\\\n    | o _ o |\n     \\  V  /\n     /     \\\n    /|     |\\");
+          case 'demon': return renderAscii("   /\\       /\\\n  /  \\_____/  \\\n |   _     _   |\n |  (o)   (o)  |\n  \\     ^     /\n   |  \\___/  |");
+          case 'dragon': return renderAscii("       \\||/\n      \\||//\n    .-/    \\-.\n   /         \\\n  |  o     o  |\n   \\    V    /\n    \\  ___  /");
+          default: return renderAscii(" [?] ");
+        }
       }
     };
 
