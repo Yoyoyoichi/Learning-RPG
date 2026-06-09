@@ -255,6 +255,10 @@ const ARMOR_TIERS = [
   { name: 'イージスの盾', def: 15 }
 ];
 
+
+const getWeaponAtk = (level) => WEAPON_TIERS.slice(0, level).reduce((sum, w) => sum + w.atk, 0);
+const getArmorDef = (level) => ARMOR_TIERS.slice(0, level).reduce((sum, w) => sum + w.def, 0);
+
 // Initial Player Stats
 const INITIAL_PLAYER = {
   x: 0,
@@ -1848,11 +1852,11 @@ function App() {
       <div className="inventory-list">
         <div className={`inventory-slot ${player.swordLevel || player.swordEquipped ? 'equipped' : ''}`}>
           <span className="equip-icon">{player.swordLevel || player.swordEquipped ? (isStealthMode ? 'Swd' : '🗡️') : (isStealthMode ? '-' : '➖')}</span>
-          <span>{player.swordLevel || player.swordEquipped ? `剣 Lv.${player.swordLevel || (player.swordEquipped ? 2 : 0)} (開始時 筋力+${player.swordLevel || 2})` : '遺物スロット'}</span>
+          <span>{player.swordLevel || player.swordEquipped ? `剣 Lv.${player.swordLevel || (player.swordEquipped ? 2 : 0)} (永続 攻撃力+${getWeaponAtk(player.swordLevel || (player.swordEquipped ? 2 : 0))})` : '遺物スロット'}</span>
         </div>
         <div className={`inventory-slot ${player.shieldLevel || player.shieldEquipped ? 'equipped' : ''}`}>
           <span className="equip-icon">{player.shieldLevel || player.shieldEquipped ? (isStealthMode ? 'Defend' : '🛡️') : (isStealthMode ? '-' : '➖')}</span>
-          <span>{player.shieldLevel || player.shieldEquipped ? `盾 Lv.${player.shieldLevel || (player.shieldEquipped ? 2 : 0)} (開始時 ブロック+${(player.shieldLevel || 2) * 2})` : '遺物スロット'}</span>
+          <span>{player.shieldLevel || player.shieldEquipped ? `盾 Lv.${player.shieldLevel || (player.shieldEquipped ? 2 : 0)} (永続 防御力+${getArmorDef(player.shieldLevel || (player.shieldEquipped ? 2 : 0))})` : '遺物スロット'}</span>
         </div>
       </div>
     </div>
@@ -2506,7 +2510,7 @@ function App() {
         playerMaxEnergy: player.maxEnergy || 3,
         playerBlock: startingBlock,
         playerStatus: {
-          strength: ((player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0) + (player.swordLevel || (player.swordEquipped ? 2 : 0)),
+          strength: ((player.relics && player.relics.some(r => r.key === 'strength_ring')) ? 1 : 0),
           vulnerable: 0,
           weak: 0,
           barricade: 0,
