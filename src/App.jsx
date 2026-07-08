@@ -121,14 +121,14 @@ const generateDungeon = (floor) => {
   // 6. Spawn Enemies
   const enemies = [];
   const enemyTypes = [
-    { subType: 'slime', char: 's', name: 'スライム', hp: 5, atk: 5, def: 0, xp: 4, gold: 3 },
-    { subType: 'bat', char: 'b', name: 'コウモリ', hp: 6, atk: 6, def: 0, xp: 5, gold: 4 },
-    { subType: 'skeleton', char: 'S', name: 'スケルトン', hp: 7, atk: 4, def: 1, xp: 12, gold: 8 },
-    { subType: 'ghost', char: 'G', name: 'ゴースト', hp: 10, atk: 4, def: 1, xp: 25, gold: 13 },
-    { subType: 'werewolf', char: 'w', name: 'ウェアウルフ', hp: 18, atk: 6, def: 1, xp: 40, gold: 20 },
-    { subType: 'vampire', char: 'V', name: 'ヴァンパイア', hp: 22, atk: 7, def: 2, xp: 55, gold: 30 },
-    { subType: 'demon', char: 'd', name: 'デーモン', hp: 30, atk: 9, def: 2, xp: 80, gold: 45 },
-    { subType: 'dragon', char: 'D', name: 'ドラゴン', hp: 50, atk: 12, def: 4, xp: 150, gold: 80 }
+    { subType: 'slime', char: 's', name: '這いずる死体', hp: 5, atk: 5, def: 0, xp: 4, gold: 3, speed: 0.5 },
+    { subType: 'bat', char: 'b', name: '感染したコウモリ', hp: 6, atk: 6, def: 0, xp: 5, gold: 4, speed: 1.5 },
+    { subType: 'skeleton', char: 'S', name: 'ウォーカー', hp: 7, atk: 4, def: 1, xp: 12, gold: 8, speed: 1.0 },
+    { subType: 'ghost', char: 'G', name: 'バンシー', hp: 10, atk: 4, def: 1, xp: 25, gold: 13, speed: 1.0 },
+    { subType: 'werewolf', char: 'w', name: 'ミュータントハウンド', hp: 18, atk: 6, def: 1, xp: 40, gold: 20, speed: 2.0 },
+    { subType: 'vampire', char: 'V', name: 'ブラッドサッカー', hp: 22, atk: 7, def: 2, xp: 55, gold: 30, speed: 1.5 },
+    { subType: 'demon', char: 'd', name: 'ジャガーノート', hp: 30, atk: 9, def: 2, xp: 80, gold: 45, speed: 0.8 },
+    { subType: 'dragon', char: 'D', name: 'タイラント', hp: 50, atk: 12, def: 4, xp: 150, gold: 80, speed: 1.2 }
   ];
 
   // Limit enemy pool depending on floor difficulty
@@ -167,16 +167,18 @@ const generateDungeon = (floor) => {
     const room = rooms[i];
 
     // Spawn Enemies in the room (increased spawn rate)
-    const enemiesToSpawn = Math.floor(Math.random() * 2) + 2; // 2 to 3 enemies per room
+    const enemiesToSpawn = Math.floor(Math.random() * 4) + 4; // 4 to 7 enemies per room
     for (let e = 0; e < enemiesToSpawn; e++) {
       const enemyX = Math.floor(room.x + Math.random() * room.w);
       const enemyY = Math.floor(room.y + Math.random() * room.h);
       
       if (!(enemyX === lastRoom.cx && enemyY === lastRoom.cy) && !enemies.some(en => en.x === enemyX && en.y === enemyY)) {
-        const et = activePool[Math.floor(Math.random() * activePool.length)];
-        // Scale enemy stats based on floor level
-        const statScale = 1 + (floor - 1) * 0.25;
+        let et = activePool[Math.floor(Math.random() * activePool.length)];
+        if (et.subType === 'bat' && Math.random() < 0.75) {
+          et = activePool[0]; // fallback to crawler
+        }
         
+        const statScale = 1 + (floor - 1) * 0.25;
         enemies.push({
           id: entityIdCounter++,
           x: enemyX,
@@ -190,7 +192,9 @@ const generateDungeon = (floor) => {
           atk: Math.round(et.atk * statScale),
           def: Math.round(et.def * statScale),
           xp: Math.round(et.xp * statScale),
-          gold: Math.round(et.gold * statScale)
+          gold: Math.round(et.gold * statScale),
+          speed: et.speed || 1.0,
+          ap: 0
         });
       }
     }
@@ -1009,26 +1013,82 @@ function App() {
     const getEnemySprite = (subType) => {
       if (isStealthMode) {
         switch(subType) {
-          case 'slime': return 'Slime';
-          case 'bat': return 'Bat';
-          case 'skeleton': return 'Skeleton';
-          case 'ghost': return 'Ghost';
-          case 'werewolf': return 'Werewolf';
-          case 'vampire': return 'Vampire';
-          case 'demon': return 'Demon';
-          case 'dragon': return 'Dragon';
-          default: return 'Enemy';
+          case 'slime': return 'Crawler';
+          case 'bat': return 'Infected Bat';
+          case 'skeleton': return 'Walker';
+          case 'ghost': return 'Banshee';
+          case 'werewolf': return 'Mutant Hound';
+          case 'vampire': return 'Bloodsucker';
+          case 'demon': return 'Juggernaut';
+          case 'dragon': return 'Tyrant';
+          default: return 'Zombie';
         }
       } else {
         switch(subType) {
-          case 'slime': return renderAscii("      _..._\n    .'     '.\n   /  O   O  \\\n  |   .___    |\n   \\         /\n    `'-----'`");
-          case 'bat': return renderAscii(" ^\\/\\^       ^/\\/^\n   \\  \\  V  /  /\n    \\  \\(_)/  /\n     \\  / \\  /\n      \\/   \\/");
-          case 'skeleton': return renderAscii("      .-\.\n     (o o)\n     | O |\n     \\   /\n     |   |\n    /|\\ /|\\\n   / | V | \\");
-          case 'ghost': return renderAscii("     .----.\n   .'      '.\n  /  O    O  \\\n  |    __    |\n  \\  `~  ~`  /\n   '.___.''.__");
-          case 'werewolf': return renderAscii("      /\\_/\\\n     / o o \\\n    (   \"   )\n     \\~---~/\n     /     \\\n   _/       \\_");
-          case 'vampire': return renderAscii("    /^\\_-_/^\\\n    | o _ o |\n     \\  V  /\n     /     \\\n    /|     |\\");
-          case 'demon': return renderAscii("   /\\       /\\\n  /  \\_____/  \\\n |   _     _   |\n |  (o)   (o)  |\n  \\     ^     /\n   |  \\___/  |");
-          case 'dragon': return renderAscii("       \\||/\n      \\||//\n    .-/    \\-.\n   /         \\\n  |  o     o  |\n   \\    V    /\n    \\  ___  /");
+          case 'slime': return renderAscii([
+            "      ___..._",
+            "    .'  _    '.",
+            "   /  x   x  \\\\",
+            "  |   .___.   |",
+            "   \\\\    x    /",
+            "    `'-----'`"
+          ].join('\\n'));
+          case 'bat': return renderAscii([
+            " ^\\\\/\\\\^       ^/\\\\/^",
+            "   \\\\  \\\\  V  /  /",
+            "    \\\\  \\\\(x)/  /",
+            "     \\\\ _/ \\\\_ /",
+            "      \\\\/   \\\\/"
+          ].join('\\n'));
+          case 'skeleton': return renderAscii([
+            "      .-\\\\\\\\-.",
+            "     (x _ x)",
+            "     | | | |",
+            "     \\\\ \\\\ / /",
+            "     | | | |",
+            "    /| | | |\\\\",
+            "   / | X | \\\\"
+          ].join('\\n'));
+          case 'ghost': return renderAscii([
+            "     .----.",
+            "   .'      '.",
+            "  /  x    x  \\\\",
+            "  |    __    |",
+            "  \\\\  `/  \\\\`  /",
+            "   '.___.''.__"
+          ].join('\\n'));
+          case 'werewolf': return renderAscii([
+            "      /\\\\_X/\\\\",
+            "     / x x \\\\",
+            "    (   \\\"   )",
+            "     \\\\~---~/",
+            "     / X X \\\\",
+            "   _/       \\\\_"
+          ].join('\\n'));
+          case 'vampire': return renderAscii([
+            "    /^\\\\_X_/^\\\\",
+            "    | x _ x |",
+            "     \\\\  V  /",
+            "     /     \\\\",
+            "    /|  X  |\\\\"
+          ].join('\\n'));
+          case 'demon': return renderAscii([
+            "   /\\\\       /\\\\",
+            "  /  \\\\_X_X_/  \\\\",
+            " |   _     _   |",
+            " |  (x)   (x)  |",
+            "  \\\\     ^     /",
+            "   |  \\\\___/  |"
+          ].join('\\n'));
+          case 'dragon': return renderAscii([
+            "       \\\\||/",
+            "      \\\\||//",
+            "    .-/XXXX\\\\-.",
+            "   /          \\\\",
+            "  |  x      x  |",
+            "   \\\\    XX    /",
+            "    \\\\  ____  /"
+          ].join('\\n'));
           default: return renderAscii(" [?] ");
         }
       }
@@ -2483,6 +2543,76 @@ function App() {
     }
   };
 
+  const processEnemyAI = (currentEnemies, targetPlayer) => {
+    let updatedEnemies = [];
+    for (let enemy of currentEnemies) {
+      let e = { ...enemy };
+      e.ap = (e.ap || 0) + (e.speed || 1.0) * 100;
+      
+      while (e.ap >= 100) {
+        e.ap -= 100;
+        
+        const dx = targetPlayer.x - e.x;
+        const dy = targetPlayer.y - e.y;
+        const dist = Math.abs(dx) + Math.abs(dy);
+
+        if (dist === 1) {
+          continue; // Adjacent: stop moving
+        }
+
+        if (dist <= 7) {
+          if (Math.random() < 0.25) continue; // slack off
+
+          const stepX = Math.sign(dx);
+          const stepY = Math.sign(dy);
+
+          let axes = Math.random() > 0.5 
+            ? [{x: stepX, y: 0}, {x: 0, y: stepY}] 
+            : [{x: 0, y: stepY}, {x: stepX, y: 0}];
+
+          let moved = false;
+          for (let axis of axes) {
+            if (axis.x === 0 && axis.y === 0) continue;
+            let nextX = e.x + axis.x;
+            let nextY = e.y + axis.y;
+
+            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+            let isOccupied = updatedEnemies.some(ue => ue.x === nextX && ue.y === nextY) || 
+                             currentEnemies.some(ne => ne.id !== e.id && ne.x === nextX && ne.y === nextY) ||
+                             (nextX === targetPlayer.x && nextY === targetPlayer.y);
+
+            if (!isBlocked && !isOccupied) {
+              e.x = nextX;
+              e.y = nextY;
+              moved = true;
+              break;
+            }
+          }
+        } else {
+          if (Math.random() < 0.3) {
+            const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+            const [rx, ry] = dirs[Math.floor(Math.random() * dirs.length)];
+            let nextX = e.x + rx;
+            let nextY = e.y + ry;
+            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
+            let isOccupied = updatedEnemies.some(ue => ue.x === nextX && ue.y === nextY) || 
+                             currentEnemies.some(ne => ne.id !== e.id && ne.x === nextX && ne.y === nextY) ||
+                             (nextX === targetPlayer.x && nextY === targetPlayer.y);
+            if (!isBlocked && !isOccupied) {
+              e.x = nextX;
+              e.y = nextY;
+            }
+          }
+        }
+        
+        const newDist = Math.abs(targetPlayer.x - e.x) + Math.abs(targetPlayer.y - e.y);
+        if (newDist === 1) break;
+      }
+      updatedEnemies.push(e);
+    }
+    return updatedEnemies;
+  };
+
   const handleMove = (dx, dy) => {
     if (gameOver || gameVictory || activeQuiz || battle || campsite || cardReward) return;
 
@@ -2722,54 +2852,7 @@ function App() {
 
     // Process Enemy chase AI
     if (turnConsumed) {
-      nextEnemies = nextEnemies.map(enemy => {
-        const dx = nextPlayer.x - enemy.x;
-        const dy = nextPlayer.y - enemy.y;
-        const dist = Math.abs(dx) + Math.abs(dy);
-
-        if (dist === 1) return enemy;
-
-        if (dist <= 5) {
-          // 25%の確率で追跡をサボる（プレイヤーが逃げ切れるようにするため）
-          if (Math.random() < 0.25) return enemy;
-
-          const stepX = Math.sign(dx);
-          const stepY = Math.sign(dy);
-
-          // ランダムにX軸・Y軸どちらを優先するか決める
-          let axes = Math.random() > 0.5 
-            ? [{x: stepX, y: 0}, {x: 0, y: stepY}] 
-            : [{x: 0, y: stepY}, {x: stepX, y: 0}];
-
-          for (let axis of axes) {
-            if (axis.x === 0 && axis.y === 0) continue;
-            let nextX = enemy.x + axis.x;
-            let nextY = enemy.y + axis.y;
-
-            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-            let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
-
-            if (!isBlocked && !isOccupied) {
-              return { ...enemy, x: nextX, y: nextY };
-            }
-          }
-        } else {
-          // プレイヤーから遠い場合は30%の確率でランダムに徘徊
-          if (Math.random() < 0.3) {
-            const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
-            const [rx, ry] = dirs[Math.floor(Math.random() * dirs.length)];
-            let nextX = enemy.x + rx;
-            let nextY = enemy.y + ry;
-            let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-            let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === nextPlayer.x && nextY === nextPlayer.y);
-            if (!isBlocked && !isOccupied) {
-              return { ...enemy, x: nextX, y: nextY };
-            }
-          }
-        }
-        return enemy;
-      });
-
+      nextEnemies = processEnemyAI(nextEnemies, nextPlayer);
       setPlayer(nextPlayer);
       setEnemies(nextEnemies);
       setItems(nextItems);
@@ -2783,52 +2866,7 @@ function App() {
     playMoveSound();
 
     let nextEnemies = [...enemies];
-    nextEnemies = nextEnemies.map(enemy => {
-      const dx = player.x - enemy.x;
-      const dy = player.y - enemy.y;
-      const dist = Math.abs(dx) + Math.abs(dy);
-
-      if (dist === 1) return enemy;
-
-      if (dist <= 5) {
-        // 25%の確率で追跡をサボる（プレイヤーが逃げ切れるようにするため）
-        if (Math.random() < 0.25) return enemy;
-
-        const stepX = Math.sign(dx);
-        const stepY = Math.sign(dy);
-
-        let axes = Math.random() > 0.5 
-          ? [{x: stepX, y: 0}, {x: 0, y: stepY}] 
-          : [{x: 0, y: stepY}, {x: stepX, y: 0}];
-
-        for (let axis of axes) {
-          if (axis.x === 0 && axis.y === 0) continue;
-          let nextX = enemy.x + axis.x;
-          let nextY = enemy.y + axis.y;
-
-          let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-          let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
-
-          if (!isBlocked && !isOccupied) {
-            return { ...enemy, x: nextX, y: nextY };
-          }
-        }
-      } else {
-        if (Math.random() < 0.3) {
-          const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
-          const [rx, ry] = dirs[Math.floor(Math.random() * dirs.length)];
-          let nextX = enemy.x + rx;
-          let nextY = enemy.y + ry;
-          let isBlocked = grid[nextY] && grid[nextY][nextX] && grid[nextY][nextX].type === 'wall';
-          let isOccupied = nextEnemies.some(e => e.x === nextX && e.y === nextY) || (nextX === player.x && nextY === player.y);
-          if (!isBlocked && !isOccupied) {
-            return { ...enemy, x: nextX, y: nextY };
-          }
-        }
-      }
-      return enemy;
-    });
-
+    nextEnemies = processEnemyAI(nextEnemies, player);
     setEnemies(nextEnemies);
   };
 
