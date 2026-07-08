@@ -2,6 +2,7 @@ import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import MemoryRPG from './MemoryRPG.jsx'
+import App from './App.jsx'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -25,10 +26,13 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const params = new URLSearchParams(window.location.search);
+const isOriginal = params.get('original') === 'true';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <MemoryRPG />
+      {isOriginal ? <App /> : <MemoryRPG />}
     </ErrorBoundary>
   </StrictMode>,
 )
