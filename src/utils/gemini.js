@@ -130,3 +130,157 @@ ${objectsSchema}
     throw error;
   }
 };
+
+export const generateQuizFeedback = async (questionObj, answer, isCorrect) => {
+  const genAI = getGenAI();
+  if (!genAI) {
+    return {
+      tutorExplanation: `（Gemini APIキーが設定されていないため、解説は生成されませんでした。）`
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-lite-latest",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    const choicesStr = questionObj.shuffledChoices ? `選択肢: ${questionObj.shuffledChoices.join(', ')}` : '選択肢なし（タイピング問題など）';
+    
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師です。
+プレイヤーが以下の問題に解答しました。
+
+問題: ${questionObj.question}
+選択肢: ${choicesStr}
+プレイヤーの解答: ${answer}
+結果: ${isCorrect ? '正解' : '不正解'}
+正解: ${questionObj.answer}
+${questionObj.explanation ? `解説: ${questionObj.explanation}` : ''}
+
+上記の解答状況を踏まえて、解答に対するフィードバックと、なぜその答えになるのか・どう覚えればいいかの解説を生成してください。
+※絶対にネガティブな発言や、皮肉、プレイヤーを貶めるような発言はしないでください。明るく優しい口調にしてください。
+
+以下の情報をJSONフォーマットで出力してください。
+{
+  "tutorExplanation": "..."
+}`;
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    const response = await result.response;
+    let text = response.text().trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API Feedback Error:", error);
+    return {
+      tutorExplanation: `APIエラー: ${error.message || error}`
+    };
+  }
+};
+
+export const generateGameStateComment = async (gameState) => {
+  const genAI = getGenAI();
+  if (!genAI) return null;
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-lite-latest",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師です。
+現在、プレイヤーは以下の状況に置かれています。
+
+【ゲーム状況】
+階層: 第${gameState.floor}階層
+プレイヤーHP: ${gameState.hp} / ${gameState.maxHp}
+${gameState.inBattle ? `戦闘中: 敵「${gameState.enemyName}」 (HP: ${gameState.enemyHp})` : '探索中（戦闘は発生していません）'}
+${gameState.recentQuestion ? `直近のクイズ問題: ${gameState.recentQuestion.question} (正解: ${gameState.recentQuestion.answer})` : ''}
+
+上記の状況を踏まえて、プレイヤーを応援する、またはメタ的なツッコミを入れるアドバイスを1つ生成してください。（50文字以内）
+※絶対にネガティブな発言や、皮肉、プレイヤーを貶めるような発言はしないでください。明るく優しい口調にしてください。
+
+以下の情報をJSONフォーマットで出力してください。
+{
+  "comment": "..."
+}`;
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    const response = await result.response;
+    let text = response.text().trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API GameState Comment Error:", error);
+    return null;
+  }
+};
+
+export const generateQuizHint = async (questionObj) => {
+  const genAI = getGenAI();
+  if (!genAI) return null;
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-lite-latest",
+      generationConfig: { responseMimeType: "application/json" }
+    });
+
+    const choicesStr = questionObj.shuffledChoices ? `選択肢: ${questionObj.shuffledChoices.join(', ')}` : '選択肢なし（タイピング問題など）';
+    
+    const prompt = `あなたはファンタジーRPGの専属AI家庭教師です。
+プレイヤーが以下の問題で悩んでいます。
+
+問題: ${questionObj.question}
+正解: ${questionObj.answer}
+${choicesStr}
+${questionObj.explanation ? `解説: ${questionObj.explanation}` : ''}
+
+プレイヤーに「正解そのもの」を直接教えずに、少しだけひらめくような「ヒント」を1つだけ生成してください。（50文字以内）
+※絶対に正解そのものを書かないでください。明るく優しい口調にしてください。
+
+以下の情報をJSONフォーマットで出力してください。
+{
+  "comment": "..."
+}`;
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini API timeout (8s)")), 8000)
+    );
+
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    const response = await result.response;
+    let text = response.text().trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API Quiz Hint Error:", error);
+    return null;
+  }
+};
