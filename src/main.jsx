@@ -1,6 +1,7 @@
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import App from './App.jsx'
 import MemoryRPG from './MemoryRPG.jsx'
 
 class ErrorBoundary extends React.Component {
@@ -25,10 +26,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// URLパラメータに "?original=true" または "?mode=original" が入っているかチェックして切り替える
+const params = new URLSearchParams(window.location.search);
+const showOriginal = params.get('original') === 'true' || params.get('mode') === 'original';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <MemoryRPG />
+      {showOriginal ? <App /> : <MemoryRPG />}
     </ErrorBoundary>
   </StrictMode>,
 )
