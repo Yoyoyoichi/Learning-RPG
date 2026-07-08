@@ -26,14 +26,13 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// URLパラメータに "?original=true" または "?mode=original" が入っているかチェックして切り替える
 const params = new URLSearchParams(window.location.search);
-const showOriginal = params.get('original') === 'true' || params.get('mode') === 'original';
+const isOriginal = params.get('original') === 'true' || params.get('mode') === 'original';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      {showOriginal ? <App /> : <MemoryRPG />}
+      {isOriginal ? <App /> : <MemoryRPG />}
     </ErrorBoundary>
   </StrictMode>,
 )
